@@ -1,0 +1,33 @@
+{
+  "name": "rikudou/psr6-dynamo-db",
+  "description": "PSR-6 cache implementation",
+  "minimum-stability": "stable",
+  "license": "MIT",
+  "require": {
+    "psr/cache": "^1.0",
+    "php": "^7.2",
+    "aws/aws-sdk-php": "^3.0",
+    "rikudou/clock": "^1.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Rikudou\\DynamoDbCache\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Rikudou\\Tests\\DynamoDbCache\\": "tests/"
+    }
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^2.16",
+    "phpstan/phpstan": "^0.12.43",
+    "phpunit/phpunit": "^9.3"
+  },
+  "scripts": {
+    "fixer": "php-cs-fixer fix src --verbose",
+    "phpstan": "phpstan analyse --level max src",
+    "phpunit": "phpunit",
+    "test": "composer fixer -- --dry-run && composer phpstan && composer phpunit"
+  }
+}
