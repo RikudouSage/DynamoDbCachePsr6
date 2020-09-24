@@ -32,3 +32,17 @@ jobs:
         run: composer install
       - name: Run tests
         run: composer phpunit
+  coverage:
+    name: Report Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+      - name: Install Dependencies
+        run: composer install
+      - name: Generate Coverage
+        run: composer phpunit -- --coverage-clover ./coverage/lcov.info
+      - name: Publish Coverage
+        uses: coverallsapp/github-action@v1.1.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
