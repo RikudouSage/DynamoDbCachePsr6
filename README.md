@@ -1,0 +1,2 @@
+![Tests](https://github.com/RikudouSage/DynamoDbCachePsr6/workflows/Tests/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/RikudouSage/DynamoDbCachePsr6/badge.svg?branch=master)](https://coveralls.io/github/RikudouSage/DynamoDbCachePsr6?branch=master)
