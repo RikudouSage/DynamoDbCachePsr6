@@ -63,3 +63,72 @@ function get(string $key): string {
     return $result;
 }
 ```
+
+## Converters
+
+This implementation supports all instances of `\Psr\Cache\CacheItemInterface` with the use of converters which
+convert the object to `\Rikudou\DynamoDbCache\DynamoCacheItem`. Note that some information may be lost in the
+conversion, notably expiration date.
+
+You can write your own converter for your specific class which includes support for expiration date like this:
+
+```php
+<?php
+
+use Rikudou\DynamoDbCache\Converter\CacheItemConverterInterface;
+use Psr\Cache\CacheItemInterface;
+use Rikudou\DynamoDbCache\DynamoCacheItem;
+
+class MyCacheItemConverter implements CacheItemConverterInterface
+{
+    /**
+     * If this methods returns true, the converter will be used
+     */
+    public function supports(CacheItemInterface $cacheItem): bool
+    {
+        return $cacheItem instanceof MyCacheItem;
+    }
+    
+    public function convert(CacheItemInterface $cacheItem): DynamoCacheItem
+    {
+        assert($cacheItem instanceof MyCacheItem);
+        return new DynamoCacheItem(
+            $cacheItem->getKey(),
+            $cacheItem->isHit(),
+            $cacheItem->get(),
+            $cacheItem->getExpirationDate() // this is a custom method from the hypothetical MyCacheItem
+        );
+    }
+}
+```
+
+You then need to register it in the converter and assign the converter to the cache:
+
+```php
+<?php
+
+use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
+use Rikudou\DynamoDbCache\DynamoDbCache;
+use Aws\DynamoDb\DynamoDbClient;
+
+// you don't need to add the default one as well, it will be added automatically if it's missing
+$converter = new CacheItemConverterRegistry(new MyCacheItemConverter());
+$dynamoClient = new DynamoDbClient([]);
+$cache = new DynamoDbCache(
+    'myTable',
+    $dynamoClient,
+    'id',
+    'ttl',
+    'value',
+    null,
+    $converter
+);
+
+$myOldCache = new MyCacheImplementation();
+$cacheItem = $myOldCache->getItem('test'); // this is now an instance of MyCacheItem
+
+// your custom converter will get used to convert it to DynamoCacheItem
+// if you didn't supply your own converter, the \Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter
+// would be used and the information about expiration date would be lost
+$cache->save($cacheItem);
+```
