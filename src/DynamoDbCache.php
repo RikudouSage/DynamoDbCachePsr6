@@ -11,9 +11,12 @@ use Psr\Cache\CacheItemPoolInterface;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
+use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoDbCache implements CacheItemPoolInterface
 {
+    private const RESERVED_CHARACTERS = '{}()/\@:';
+
     /**
      * @var string
      */
@@ -83,10 +86,16 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param string $key
      *
+     * @throws InvalidArgumentException
+     *
      * @return DynamoCacheItem
      */
     public function getItem($key)
     {
+        if ($exception = $this->getExceptionForInvalidKey($key)) {
+            throw $exception;
+        }
+
         try {
             $item = $this->client->getItem([
                 'Key' => [
@@ -121,10 +130,17 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param string[] $keys
      *
+     * @throws InvalidArgumentException
+     *
      * @return DynamoCacheItem[]
      */
     public function getItems(array $keys = [])
     {
+        array_map(function ($key) {
+            if ($exception = $this->getExceptionForInvalidKey($key)) {
+                throw $exception;
+            }
+        }, $keys);
         $response = $this->client->batchGetItem([
             'RequestItems' => [
                 $this->tableName => [
@@ -193,12 +209,18 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param string|DynamoCacheItem $key
      *
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function deleteItem($key)
     {
         if ($key instanceof DynamoCacheItem) {
             $key = $key->getKey();
+        }
+
+        if ($exception = $this->getExceptionForInvalidKey($key)) {
+            throw $exception;
         }
 
         try {
@@ -220,10 +242,18 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param string[] $keys
      *
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function deleteItems(array $keys)
     {
+        array_map(function ($key) {
+            if ($exception = $this->getExceptionForInvalidKey($key)) {
+                throw $exception;
+            }
+        }, $keys);
+
         try {
             $this->client->batchWriteItem([
                 'RequestItems' => [
@@ -255,6 +285,9 @@ final class DynamoDbCache implements CacheItemPoolInterface
     public function save(CacheItemInterface $item)
     {
         $item = $this->converter->convert($item);
+        if ($exception = $this->getExceptionForInvalidKey($item->getKey())) {
+            throw $exception;
+        }
 
         try {
             $data = [
@@ -288,6 +321,9 @@ final class DynamoDbCache implements CacheItemPoolInterface
      */
     public function saveDeferred(CacheItemInterface $item)
     {
+        if ($exception = $this->getExceptionForInvalidKey($item->getKey())) {
+            throw $exception;
+        }
         $item = $this->converter->convert($item);
 
         $this->deferred[] = $item;
@@ -311,5 +347,20 @@ final class DynamoDbCache implements CacheItemPoolInterface
         }
 
         return $result;
+    }
+
+    private function getExceptionForInvalidKey(string $key): ?InvalidArgumentException
+    {
+        if (strpbrk($key, self::RESERVED_CHARACTERS) !== false) {
+            return new InvalidArgumentException(
+                sprintf(
+                    "The key '%s' cannot contain any of the reserved characters: '%s'",
+                    $key,
+                    self::RESERVED_CHARACTERS
+                )
+            );
+        }
+
+        return null;
     }
 }

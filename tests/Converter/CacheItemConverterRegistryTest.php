@@ -2,15 +2,15 @@
 
 namespace Rikudou\Tests\DynamoDbCache\Converter;
 
+use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use ReflectionProperty;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
-use PHPUnit\Framework\TestCase;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 
-class CacheItemConverterRegistryTest extends TestCase
+final class CacheItemConverterRegistryTest extends TestCase
 {
     public function testConstruction()
     {
@@ -37,7 +37,6 @@ class CacheItemConverterRegistryTest extends TestCase
     private function getFakeConverter(): CacheItemConverterInterface
     {
         return new class implements CacheItemConverterInterface {
-
             public function supports(CacheItemInterface $cacheItem): bool
             {
                 return true;

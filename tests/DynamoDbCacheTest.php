@@ -8,7 +8,9 @@ use Aws\Result;
 use DateTime;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
+use ReflectionClass;
 use ReflectionObject;
+use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 use stdClass;
@@ -415,6 +417,59 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($result);
         self::assertCount(1, $deferred->getValue($this->instanceFailure));
         self::assertCount(0, $this->itemPoolSaved);
+    }
+
+    public function testInvalidKeys()
+    {
+        $chars = array_filter(preg_split(
+            '@@',
+            (new ReflectionClass(DynamoDbCache::class))->getConstant('RESERVED_CHARACTERS')
+        ));
+
+        foreach ($chars as $char) {
+            $key = 'random' . $char . 'name';
+
+            try {
+                $this->instance->getItem($key);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->getItems([$key]);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->deleteItem($key);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->deleteItems([$key]);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            $item = new DynamoCacheItem($key, true, '', null);
+
+            try {
+                $this->instance->save($item);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->saveDeferred($item);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+        }
+
+        // dummy assertion
+        self::assertTrue(true);
     }
 
     private function getFakeClient(

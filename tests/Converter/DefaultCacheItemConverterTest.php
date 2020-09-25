@@ -2,12 +2,12 @@
 
 namespace Rikudou\Tests\DynamoDbCache\Converter;
 
+use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
-use PHPUnit\Framework\TestCase;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 
-class DefaultCacheItemConverterTest extends TestCase
+final class DefaultCacheItemConverterTest extends TestCase
 {
     /**
      * @var DynamoCacheItem
@@ -50,7 +50,6 @@ class DefaultCacheItemConverterTest extends TestCase
     private function createBasicCacheItem()
     {
         return new class implements CacheItemInterface {
-
             public function getKey()
             {
                 return 'test';
