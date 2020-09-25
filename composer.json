@@ -24,6 +24,9 @@
     "phpstan/phpstan": "^0.12.43",
     "phpunit/phpunit": "^9.3"
   },
+  "provide": {
+    "psr/cache-implementation": "1.0"
+  },
   "scripts": {
     "fixer": "php-cs-fixer fix src --verbose",
     "phpstan": "phpstan analyse --level max src",
