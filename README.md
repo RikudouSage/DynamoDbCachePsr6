@@ -1,7 +1,7 @@
 [![Tests](https://github.com/RikudouSage/DynamoDbCachePsr6/workflows/Tests/badge.svg)](https://github.com/RikudouSage/DynamoDbCachePsr6/actions?query=workflow%3ATests)
 [![Coverage Status](https://coveralls.io/repos/github/RikudouSage/DynamoDbCachePsr6/badge.svg?branch=master)](https://coveralls.io/github/RikudouSage/DynamoDbCachePsr6?branch=master)
 
-Library for storing cache in DynamoDB implementing the PSR-6 interface.
+Library for storing cache in DynamoDB implementing the PSR-6 and PSR-16 interfaces.
 See also [Symfony bundle](https://github.com/RikudouSage/DynamoDbCachePsr6Bundle) of this library.
 
 ## Installation
@@ -11,7 +11,7 @@ See also [Symfony bundle](https://github.com/RikudouSage/DynamoDbCachePsr6Bundle
 ## Usage
 
 The usage is pretty straight-forward, you just define the details in constructor and then use it as any other
-PSR-6 implementation:
+PSR-6 or PSR-16 implementation:
 
 ```php
 <?php

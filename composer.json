@@ -1,6 +1,6 @@
 {
   "name": "rikudou/psr6-dynamo-db",
-  "description": "PSR-6 cache implementation using AWS DynamoDB",
+  "description": "PSR-6 and PSR-16 cache implementation using AWS DynamoDB",
   "minimum-stability": "stable",
   "license": "MIT",
   "require": {
