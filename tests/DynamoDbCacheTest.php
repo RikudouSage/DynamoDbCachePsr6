@@ -2,14 +2,18 @@
 
 namespace Rikudou\Tests\DynamoDbCache;
 
+use ArrayIterator;
 use Aws\DynamoDb\DynamoDbClient;
 use Aws\DynamoDb\Exception\DynamoDbException;
 use Aws\Result;
+use DateInterval;
 use DateTime;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use ReflectionClass;
 use ReflectionObject;
+use Rikudou\Clock\TestClock;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
@@ -419,6 +423,169 @@ final class DynamoDbCacheTest extends TestCase
         self::assertCount(0, $this->itemPoolSaved);
     }
 
+    public function testGet()
+    {
+        self::assertEquals('test', $this->instance->get('test123'));
+        self::assertNull($this->instance->get('test456'));
+        self::assertEquals('defaultValue', $this->instance->get('test456', 'defaultValue'));
+        self::assertInstanceOf(stdClass::class, $this->instance->get('test789'));
+        self::assertNull($this->instance->get('test852'));
+        self::assertEquals('defaultValue', $this->instance->get('test852', 'defaultValue'));
+    }
+
+    public function testSet()
+    {
+        $count = 0;
+        self::assertCount($count, $this->itemPoolSaved);
+
+        self::assertTrue($this->instance->set('test', 'test'));
+        self::assertCount(++$count, $this->itemPoolSaved);
+
+        $instance = new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolDefault),
+            'id',
+            'ttl',
+            'value',
+            new TestClock(new DateTime('2030-01-01 15:00:00'))
+        );
+        self::assertTrue($instance->set('test2', 'test', 3600));
+        self::assertCount(++$count, $this->itemPoolSaved);
+        self::assertEquals(
+            '2030-01-01 16:00:00',
+            (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
+        );
+
+        self::assertTrue($instance->set('test3', 'test', new DateInterval('P1DT3S')));
+        self::assertCount(++$count, $this->itemPoolSaved);
+        self::assertEquals(
+            '2030-01-02 16:00:03',
+            (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
+        );
+    }
+
+    public function testDelete()
+    {
+        self::assertTrue($this->instance->delete('test123'));
+        self::assertTrue($this->instance->delete('test456'));
+        self::assertTrue($this->instance->delete('test789'));
+        self::assertFalse($this->instance->delete('test852'));
+    }
+
+    public function testGetMultiple()
+    {
+        $result = $this->instance->getMultiple([
+            'test123',
+            'test456',
+            'test789',
+            'test852',
+            'test258',
+        ]);
+
+        self::assertCount(5, $result);
+
+        self::assertArrayHasKey('test123', $result);
+        self::assertArrayHasKey('test456', $result);
+        self::assertArrayHasKey('test789', $result);
+        self::assertArrayHasKey('test852', $result);
+        self::assertArrayHasKey('test258', $result);
+
+        self::assertEquals('test', $result['test123']);
+        self::assertNull($result['test456']);
+        self::assertInstanceOf(stdClass::class, $result['test789']);
+        self::assertNull($result['test852']);
+        self::assertNull($result['test258']);
+
+        $result = $this->instance->getMultiple([
+            'test456',
+            'test852',
+        ], 'defaultValue');
+
+        self::assertArrayHasKey('test456', $result);
+        self::assertArrayHasKey('test852', $result);
+        self::assertEquals('defaultValue', $result['test456']);
+        self::assertEquals('defaultValue', $result['test852']);
+    }
+
+    public function testSetMultiple()
+    {
+        self::assertCount(0, $this->itemPoolSaved);
+        $data = [
+            'test147' => 'test',
+            'test258' => 'test2',
+            'test369' => 'test3',
+        ];
+
+        self::assertTrue($this->instance->setMultiple($data));
+        self::assertCount(3, $this->itemPoolSaved);
+
+        foreach ($this->itemPoolSaved as $item) {
+            switch ($item['id']['S']) {
+                case 'test147':
+                    self::assertEquals('s:4:"test";', $item['value']['S']);
+                    break;
+                case 'test258':
+                    self::assertEquals('s:5:"test2";', $item['value']['S']);
+                    break;
+                case 'test369':
+                    self::assertEquals('s:5:"test3";', $item['value']['S']);
+                    break;
+            }
+        }
+
+        $instance = new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolDefault),
+            'id',
+            'ttl',
+            'value',
+            new TestClock(new DateTimeImmutable('2030-01-01 15:00:00'))
+        );
+
+        $this->itemPoolSaved = [];
+        $instance->setMultiple($data, 3600);
+        self::assertCount(3, $this->itemPoolSaved);
+        foreach ($this->itemPoolSaved as $item) {
+            self::assertEquals(
+                '2030-01-01 16:00:00',
+                (new DateTime())->setTimestamp($item['ttl']['N'])->format('Y-m-d H:i:s')
+            );
+        }
+
+        $this->itemPoolSaved = [];
+        $instance->setMultiple($data, new DateInterval('P1DT10M'));
+        self::assertCount(3, $this->itemPoolSaved);
+        foreach ($this->itemPoolSaved as $item) {
+            self::assertEquals(
+                '2030-01-02 15:10:00',
+                (new DateTime())->setTimestamp($item['ttl']['N'])->format('Y-m-d H:i:s')
+            );
+        }
+    }
+
+    public function testDeleteMultiple()
+    {
+        self::assertTrue($this->instance->deleteMultiple([
+            'test123',
+            'test456',
+            'test789',
+        ]));
+
+        // simulate error
+        self::assertFalse($this->instance->deleteMultiple([
+            'test258',
+            'test852',
+        ]));
+    }
+
+    public function testHas()
+    {
+        self::assertTrue($this->instance->has('test123'));
+        self::assertFalse($this->instance->has('test456'));
+        self::assertTrue($this->instance->has('test789'));
+        self::assertFalse($this->instance->has('test852'));
+    }
+
     public function testInvalidKeys()
     {
         $chars = array_filter(preg_split(
@@ -466,10 +633,73 @@ final class DynamoDbCacheTest extends TestCase
                 $this->fail("Should throw an exception due to invalid character: {$char}");
             } catch (InvalidArgumentException $e) {
             }
+
+            // simple cache interface
+
+            try {
+                $this->instance->get($key);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->set($key, '');
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->delete($key);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->getMultiple([$key]);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->setMultiple([$key => 'test']);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->deleteMultiple([$key]);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
+
+            try {
+                $this->instance->has($key);
+                $this->fail("Should throw an exception due to invalid character: {$char}");
+            } catch (InvalidArgumentException $e) {
+            }
         }
 
         // dummy assertion
         self::assertTrue(true);
+    }
+
+    public function testIterables()
+    {
+        $iterable = new ArrayIterator(['test123']);
+        $iterableKeyPair = new ArrayIterator(['test123' => 'value']);
+
+        $result = $this->instance->getMultiple($iterable);
+        self::assertCount(1, $result);
+        self::assertArrayHasKey('test123', $result);
+        self::assertEquals('test', $result['test123']);
+
+        self::assertCount(0, $this->itemPoolSaved);
+        $result = $this->instance->setMultiple($iterableKeyPair);
+        self::assertTrue($result);
+        self::assertCount(1, $this->itemPoolSaved);
+        self::assertEquals('s:5:"value";', $this->itemPoolSaved[0]['value']['S']);
+
+        self::assertTrue($this->instance->deleteMultiple($iterable));
     }
 
     private function getFakeClient(

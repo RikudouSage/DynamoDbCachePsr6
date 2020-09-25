@@ -413,17 +413,25 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      * @param iterable<string> $keys
      * @param mixed            $default
      *
+     * @throws InvalidArgumentException
+     *
      * @return mixed[]
      */
     public function getMultiple($keys, $default = null)
     {
-        return array_map(function (DynamoCacheItem $item) use ($default) {
-            if ($item->isHit()) {
-                return $item->get();
-            }
+        $result = array_combine(
+            $this->iterableToArray($keys),
+            array_map(function (DynamoCacheItem $item) use ($default) {
+                if ($item->isHit()) {
+                    return $item->get();
+                }
 
-            return $default;
-        }, $this->iterableToArray($keys));
+                return $default;
+            }, $this->getItems($this->iterableToArray($keys)))
+        );
+        assert(is_array($result));
+
+        return $result;
     }
 
     /**
