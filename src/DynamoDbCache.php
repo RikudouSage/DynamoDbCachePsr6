@@ -4,16 +4,18 @@ namespace Rikudou\DynamoDbCache;
 
 use Aws\DynamoDb\DynamoDbClient;
 use Aws\DynamoDb\Exception\DynamoDbException;
+use DateInterval;
 use DateTime;
 use DateTimeImmutable;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\SimpleCache\CacheInterface;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
-final class DynamoDbCache implements CacheItemPoolInterface
+final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 {
     private const RESERVED_CHARACTERS = '{}()/\@:';
 
@@ -191,6 +193,8 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param string $key
      *
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function hasItem($key)
@@ -280,6 +284,8 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param CacheItemInterface $item
      *
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function save(CacheItemInterface $item)
@@ -317,6 +323,8 @@ final class DynamoDbCache implements CacheItemPoolInterface
     /**
      * @param CacheItemInterface $item
      *
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function saveDeferred(CacheItemInterface $item)
@@ -332,6 +340,8 @@ final class DynamoDbCache implements CacheItemPoolInterface
     }
 
     /**
+     * @throws InvalidArgumentException
+     *
      * @return bool
      */
     public function commit()
@@ -349,6 +359,88 @@ final class DynamoDbCache implements CacheItemPoolInterface
         return $result;
     }
 
+    public function get($key, $default = null)
+    {
+        $item = $this->getItem($key);
+        if (!$item->isHit()) {
+            return $default;
+        }
+
+        return $item->get();
+    }
+
+    public function set($key, $value, $ttl = null)
+    {
+        $item = $this->getItem($key);
+        if ($ttl !== null) {
+            $item->expiresAfter($ttl);
+        }
+        $item->set($value);
+
+        return $this->save($item);
+    }
+
+    public function delete($key)
+    {
+        return $this->deleteItem($key);
+    }
+
+    /**
+     * @param iterable<string> $keys
+     * @param mixed            $default
+     *
+     * @return mixed[]
+     */
+    public function getMultiple($keys, $default = null)
+    {
+        return array_map(function (DynamoCacheItem $item) use ($default) {
+            if ($item->isHit()) {
+                return $item->get();
+            }
+
+            return $default;
+        }, $this->iterableToArray($keys));
+    }
+
+    /**
+     * @param iterable<string,mixed> $values
+     * @param int|DateInterval|null  $ttl
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return bool
+     */
+    public function setMultiple($values, $ttl = null)
+    {
+        foreach ($values as $key => $value) {
+            $item = $this->getItem($key);
+            $item->set($value);
+            if ($ttl !== null) {
+                $item->expiresAfter($ttl);
+            }
+            $this->saveDeferred($item);
+        }
+
+        return $this->commit();
+    }
+
+    /**
+     * @param iterable<string> $keys
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return bool
+     */
+    public function deleteMultiple($keys)
+    {
+        return $this->deleteItems($this->iterableToArray($keys));
+    }
+
+    public function has($key)
+    {
+        return $this->hasItem($key);
+    }
+
     private function getExceptionForInvalidKey(string $key): ?InvalidArgumentException
     {
         if (strpbrk($key, self::RESERVED_CHARACTERS) !== false) {
@@ -362,5 +454,20 @@ final class DynamoDbCache implements CacheItemPoolInterface
         }
 
         return null;
+    }
+
+    /**
+     * @param iterable<mixed,mixed> $iterable
+     *
+     * @return array<mixed,mixed>
+     */
+    private function iterableToArray(iterable $iterable): array
+    {
+        if (is_array($iterable)) {
+            return $iterable;
+        } else {
+            /** @noinspection PhpParamsInspection */
+            return iterator_to_array($iterable);
+        }
     }
 }
