@@ -39,7 +39,8 @@ You must create the DynamoDB table before using this library.
 use Aws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 
-function get(string $key): string {
+function get(string $key): string
+{
     $dynamoDbClient = new DynamoDbClient([
         'region' => 'eu-central-1',
         'version' => 'latest'
@@ -60,6 +61,38 @@ function get(string $key): string {
         throw new RuntimeException('Could not save cache');
     }
 
+    return $result;
+}
+```
+
+## Example using the PSR-16 interface:
+
+```php
+<?php
+
+use Aws\DynamoDb\DynamoDbClient;
+use Rikudou\DynamoDbCache\DynamoDbCache;
+
+function get(string $key): string
+{
+    $dynamoDbClient = new DynamoDbClient([
+        'region' => 'eu-central-1',
+        'version' => 'latest'
+    ]);
+    $cache = new DynamoDbCache('cache', $dynamoDbClient); // the default field names are used - id, ttl and value
+
+    $value = $cache->get($key);
+    if ($value !== null) {
+        return $value;
+    }
+    
+    // do something to fetch the item
+    $result = '...';
+
+    if (!$cache->set($key, $result, 3600)) {
+       throw new RuntimeException('Could not save cache');     
+    }
+    
     return $result;
 }
 ```
