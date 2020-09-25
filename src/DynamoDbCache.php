@@ -359,6 +359,14 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $result;
     }
 
+    /**
+     * @param string $key
+     * @param mixed  $default
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return mixed
+     */
     public function get($key, $default = null)
     {
         $item = $this->getItem($key);
@@ -369,6 +377,15 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $item->get();
     }
 
+    /**
+     * @param string                $key
+     * @param mixed                 $value
+     * @param int|DateInterval|null $ttl
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return bool
+     */
     public function set($key, $value, $ttl = null)
     {
         $item = $this->getItem($key);
@@ -380,6 +397,13 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $this->save($item);
     }
 
+    /**
+     * @param string $key
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return bool
+     */
     public function delete($key)
     {
         return $this->deleteItem($key);
@@ -436,6 +460,13 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $this->deleteItems($this->iterableToArray($keys));
     }
 
+    /**
+     * @param string $key
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return bool
+     */
     public function has($key)
     {
         return $this->hasItem($key);
