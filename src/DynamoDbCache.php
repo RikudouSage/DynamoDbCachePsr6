@@ -10,7 +10,7 @@ use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
-use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
+use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 
 final class DynamoDbCache implements CacheItemPoolInterface
 {
@@ -49,13 +49,19 @@ final class DynamoDbCache implements CacheItemPoolInterface
      */
     private $clock;
 
+    /**
+     * @var CacheItemConverterRegistry
+     */
+    private $converter;
+
     public function __construct(
         string $tableName,
         DynamoDbClient $client,
         string $primaryField = 'id',
         string $ttlField = 'ttl',
         string $valueField = 'value',
-        ?ClockInterface $clock = null
+        ?ClockInterface $clock = null,
+        ?CacheItemConverterRegistry $converter = null
     ) {
         $this->tableName = $tableName;
         $this->client = $client;
@@ -67,6 +73,11 @@ final class DynamoDbCache implements CacheItemPoolInterface
             $clock = new Clock();
         }
         $this->clock = $clock;
+
+        if ($converter === null) {
+            $converter = new CacheItemConverterRegistry();
+        }
+        $this->converter = $converter;
     }
 
     /**
@@ -237,17 +248,13 @@ final class DynamoDbCache implements CacheItemPoolInterface
     }
 
     /**
-     * @param DynamoCacheItem $item
-     *
-     * @throws InvalidArgumentException
+     * @param CacheItemInterface $item
      *
      * @return bool
      */
     public function save(CacheItemInterface $item)
     {
-        if (!$item instanceof DynamoCacheItem) {
-            throw new InvalidArgumentException('This handler can only save instances of ' . DynamoCacheItem::class);
-        }
+        $item = $this->converter->convert($item);
 
         try {
             $data = [
@@ -275,15 +282,13 @@ final class DynamoDbCache implements CacheItemPoolInterface
     }
 
     /**
-     * @param DynamoCacheItem $item
+     * @param CacheItemInterface $item
      *
      * @return bool
      */
     public function saveDeferred(CacheItemInterface $item)
     {
-        if (!$item instanceof DynamoCacheItem) {
-            throw new InvalidArgumentException('This handler can only save instances of ' . DynamoCacheItem::class);
-        }
+        $item = $this->converter->convert($item);
 
         $this->deferred[] = $item;
 
@@ -291,8 +296,6 @@ final class DynamoDbCache implements CacheItemPoolInterface
     }
 
     /**
-     * @throws InvalidArgumentException
-     *
      * @return bool
      */
     public function commit()

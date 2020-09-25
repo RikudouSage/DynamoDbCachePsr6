@@ -344,8 +344,8 @@ final class DynamoDbCacheTest extends TestCase
         $result = $this->instanceFailure->save($cacheItem);
         self::assertFalse($result);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->instanceFailure->save($this->getEmptyBaseCacheItem());
+        $result = $this->instance->save($this->getEmptyBaseCacheItem());
+        self::assertTrue($result);
     }
 
     public function testSaveNonDefaultKeys()
@@ -380,8 +380,7 @@ final class DynamoDbCacheTest extends TestCase
 
         self::assertCount(1, $deferredList->getValue($this->instance));
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->instance->saveDeferred($this->getEmptyBaseCacheItem());
+        self::assertTrue($this->instance->saveDeferred($this->getEmptyBaseCacheItem()));
     }
 
     public function testCommit()
@@ -609,6 +608,7 @@ final class DynamoDbCacheTest extends TestCase
         return new class implements CacheItemInterface {
             public function getKey()
             {
+                return 'test';
             }
 
             public function get()
@@ -617,6 +617,7 @@ final class DynamoDbCacheTest extends TestCase
 
             public function isHit()
             {
+                return true;
             }
 
             public function set($value)
