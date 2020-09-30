@@ -165,3 +165,68 @@ $cacheItem = $myOldCache->getItem('test'); // this is now an instance of MyCache
 // would be used and the information about expiration date would be lost
 $cache->save($cacheItem);
 ```
+
+## Encoders
+
+By default the values are serialized using php serializer. If you want to share the cache with apps
+in other languages (or different php app that doesn't have the same classes), you can either use the
+`\Rikudou\DynamoDbCache\Encoder\JsonItemEncoder` or write your own.
+
+> Note: The JsonItemEncoder is lossy when it comes to objects, if you need to store object information
+> this encoder might not be for you. If you on the other hand only store scalar data and/or arrays
+> the JsonItemEncoder is enough.
+
+### Example using `JsonItemEncoder`
+
+```php
+<?php
+use Rikudou\DynamoDbCache\DynamoDbCache;
+use Aws\DynamoDb\DynamoDbClient;
+use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
+
+$encoder = new JsonItemEncoder(); // with default flags and depth
+$encoder = new JsonItemEncoder(JSON_PRETTY_PRINT, 100); // with custom flags and depth
+
+$cache = new DynamoDbCache(
+    'myTable',
+    new DynamoDbClient([]),
+    'id',
+    'ttl',
+    'value',
+    null,
+    null,
+    $encoder
+);
+```
+
+Your values will now be saved json encoded in DynamoDB.
+
+Writing your own encoder is easy, you just need to implement the
+`\Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface` interface:
+
+```php
+<?php
+
+use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
+
+class MyEncoder implements CacheItemEncoderInterface
+{
+    /**
+     * @param mixed $input
+     * @return string
+     */
+    public function encode($input) : string
+    {
+        // TODO: Implement encode() method.
+    }
+
+    /**
+     * @param string $input
+     * @return mixed
+     */
+    public function decode(string $input)
+    {
+        // TODO: Implement decode() method.
+    }
+}
+```
