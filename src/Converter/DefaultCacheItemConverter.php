@@ -3,10 +3,36 @@
 namespace Rikudou\DynamoDbCache\Converter;
 
 use Psr\Cache\CacheItemInterface;
+use Rikudou\Clock\Clock;
+use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
+use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 
 final class DefaultCacheItemConverter implements CacheItemConverterInterface
 {
+    /**
+     * @var CacheItemEncoderInterface
+     */
+    private $encoder;
+
+    /**
+     * @var ClockInterface
+     */
+    private $clock;
+
+    public function __construct(?CacheItemEncoderInterface $encoder = null, ClockInterface $clock = null)
+    {
+        if ($encoder === null) {
+            $encoder = new SerializeItemEncoder();
+        }
+        if ($clock === null) {
+            $clock = new Clock();
+        }
+        $this->encoder = $encoder;
+        $this->clock = $clock;
+    }
+
     public function supports(CacheItemInterface $cacheItem): bool
     {
         return true;
@@ -23,7 +49,9 @@ final class DefaultCacheItemConverter implements CacheItemConverterInterface
             $cacheItem->getKey(),
             $cacheItem->isHit(),
             $cacheItem->get(),
-            null
+            null,
+            $this->clock,
+            $this->encoder
         );
 
         return $cacheItem;

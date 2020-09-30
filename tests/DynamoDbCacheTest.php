@@ -13,9 +13,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use ReflectionClass;
 use ReflectionObject;
+use Rikudou\Clock\Clock;
 use Rikudou\Clock\TestClock;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\DynamoDbCache;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 use stdClass;
 
@@ -620,7 +622,14 @@ final class DynamoDbCacheTest extends TestCase
             } catch (InvalidArgumentException $e) {
             }
 
-            $item = new DynamoCacheItem($key, true, '', null);
+            $item = new DynamoCacheItem(
+                $key,
+                true,
+                '',
+                null,
+                new Clock(),
+                new SerializeItemEncoder()
+            );
 
             try {
                 $this->instance->save($item);

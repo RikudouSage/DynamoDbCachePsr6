@@ -6,9 +6,11 @@ use DateInterval;
 use DateTime;
 use PHPUnit\Framework\TestCase;
 use ReflectionObject;
+use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\Clock\TestClock;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoCacheItemTest extends TestCase
@@ -37,7 +39,8 @@ final class DynamoCacheItemTest extends TestCase
             self::DEFAULT_IS_HIT,
             self::DEFAULT_VALUE,
             self::DEFAULT_EXPIRES_AT,
-            $this->clock
+            $this->clock,
+            new SerializeItemEncoder()
         );
     }
 
@@ -105,7 +108,9 @@ final class DynamoCacheItemTest extends TestCase
             self::DEFAULT_KEY,
             self::DEFAULT_IS_HIT,
             self::DEFAULT_VALUE,
-            self::DEFAULT_EXPIRES_AT
+            self::DEFAULT_EXPIRES_AT,
+            new Clock(),
+            new SerializeItemEncoder()
         );
 
         $reflection = new ReflectionObject($instance);
