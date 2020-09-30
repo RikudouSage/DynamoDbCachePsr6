@@ -4,8 +4,10 @@ namespace Rikudou\Tests\DynamoDbCache\Converter;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
+use Rikudou\Clock\Clock;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 
 final class DefaultCacheItemConverterTest extends TestCase
 {
@@ -26,7 +28,14 @@ final class DefaultCacheItemConverterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->dynamoCacheItem = new DynamoCacheItem('test', true, 'something', null);
+        $this->dynamoCacheItem = new DynamoCacheItem(
+            'test',
+            true,
+            'something',
+            null,
+            new Clock(),
+            new SerializeItemEncoder()
+        );
         $this->basicCacheItem = $this->createBasicCacheItem();
         $this->instance = new DefaultCacheItemConverter();
     }

@@ -13,6 +13,8 @@ use Psr\SimpleCache\CacheInterface;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
+use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
@@ -59,6 +61,11 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private $converter;
 
+    /**
+     * @var CacheItemEncoderInterface
+     */
+    private $encoder;
+
     public function __construct(
         string $tableName,
         DynamoDbClient $client,
@@ -66,7 +73,8 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         string $ttlField = 'ttl',
         string $valueField = 'value',
         ?ClockInterface $clock = null,
-        ?CacheItemConverterRegistry $converter = null
+        ?CacheItemConverterRegistry $converter = null,
+        ?CacheItemEncoderInterface $encoder = null
     ) {
         $this->tableName = $tableName;
         $this->client = $client;
@@ -83,6 +91,11 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             $converter = new CacheItemConverterRegistry();
         }
         $this->converter = $converter;
+
+        if ($encoder === null) {
+            $encoder = new SerializeItemEncoder();
+        }
+        $this->encoder = $encoder;
     }
 
     /**
@@ -119,11 +132,19 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
                 ($item[$this->ttlField]['N'] ?? null) !== null
                     ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
                     : null,
-                $this->clock
+                $this->clock,
+                $this->encoder
             );
         } catch (DynamoDbException $e) {
             if ($e->getAwsErrorCode() === 'ResourceNotFoundException') {
-                return new DynamoCacheItem($key, false, null, null, $this->clock);
+                return new DynamoCacheItem(
+                    $key,
+                    false,
+                    null,
+                    null,
+                    $this->clock,
+                    $this->encoder
+                );
             }
             throw $e;
         }
@@ -167,13 +188,21 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
                 ($item[$this->ttlField]['N'] ?? null) !== null
                     ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
                     : null,
-                $this->clock
+                $this->clock,
+                $this->encoder
             );
         }
         foreach ($response->get('UnprocessedKeys')[$this->tableName] ?? [] as $item) {
             $unprocessedKeys = $item['Keys'];
             foreach ($unprocessedKeys as $key) {
-                $result[] = new DynamoCacheItem($key['S'], false, null, null, $this->clock);
+                $result[] = new DynamoCacheItem(
+                    $key['S'],
+                    false,
+                    null,
+                    null,
+                    $this->clock,
+                    $this->encoder
+                );
             }
         }
 
@@ -183,7 +212,14 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             }, $result);
             $unprocessed = array_diff($keys, $processedKeys);
             foreach ($unprocessed as $unprocessedKey) {
-                $result[] = new DynamoCacheItem($unprocessedKey, false, null, null, $this->clock);
+                $result[] = new DynamoCacheItem(
+                    $unprocessedKey,
+                    false,
+                    null,
+                    null,
+                    $this->clock,
+                    $this->encoder
+                );
             }
         }
 

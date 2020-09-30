@@ -7,8 +7,8 @@ use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Psr\Cache\CacheItemInterface;
-use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
+use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoCacheItem implements CacheItemInterface
@@ -39,28 +39,34 @@ final class DynamoCacheItem implements CacheItemInterface
     private $clock;
 
     /**
-     * @param string                 $key
-     * @param bool                   $isHit
-     * @param mixed                  $value
-     * @param DateTimeInterface|null $expiresAt
-     * @param ClockInterface|null    $clock
+     * @var CacheItemEncoderInterface|null
+     */
+    private $encoder;
+
+    /**
+     * @param string                    $key
+     * @param bool                      $isHit
+     * @param mixed                     $value
+     * @param DateTimeInterface|null    $expiresAt
+     * @param ClockInterface            $clock
+     * @param CacheItemEncoderInterface $encoder
+     *
+     * @internal
      */
     public function __construct(
         string $key,
         bool $isHit,
         $value,
         ?DateTimeInterface $expiresAt,
-        ?ClockInterface $clock = null
+        ClockInterface $clock,
+        CacheItemEncoderInterface $encoder
     ) {
         $this->key = $key;
         $this->isHit = $isHit;
         $this->expiresAt = $expiresAt;
         $this->set($value);
-
-        if ($clock === null) {
-            $clock = new Clock();
-        }
         $this->clock = $clock;
+        $this->encoder = $encoder;
     }
 
     public function getKey()
