@@ -131,7 +131,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             return new DynamoCacheItem(
                 $key,
                 $data !== null,
-                $data !== null ? unserialize($data) : null,
+                $data !== null ? $this->encoder->decode($data) : null,
                 ($item[$this->ttlField]['N'] ?? null) !== null
                     ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
                     : null,
@@ -187,7 +187,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             $result[] = new DynamoCacheItem(
                 $item[$this->primaryField]['S'],
                 true,
-                unserialize($item[$this->valueField]['S']),
+                $this->encoder->decode($item[$this->valueField]['S']),
                 ($item[$this->ttlField]['N'] ?? null) !== null
                     ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
                     : null,
