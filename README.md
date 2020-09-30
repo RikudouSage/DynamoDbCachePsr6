@@ -1,5 +1,6 @@
 [![Tests](https://github.com/RikudouSage/DynamoDbCachePsr6/workflows/Tests/badge.svg)](https://github.com/RikudouSage/DynamoDbCachePsr6/actions?query=workflow%3ATests)
 [![Coverage Status](https://coveralls.io/repos/github/RikudouSage/DynamoDbCachePsr6/badge.svg?branch=master)](https://coveralls.io/github/RikudouSage/DynamoDbCachePsr6?branch=master)
+[![Download](https://img.shields.io/packagist/dt/rikudou/psr6-dynamo-db.svg)](https://packagist.org/packages/rikudou/psr6-dynamo-db)
 
 Library for storing cache in DynamoDB implementing the PSR-6 and PSR-16 interfaces.
 See also [Symfony bundle](https://github.com/RikudouSage/DynamoDbCachePsr6Bundle) of this library.
