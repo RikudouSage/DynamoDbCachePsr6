@@ -39,7 +39,7 @@ final class DynamoCacheItem implements CacheItemInterface
     private $clock;
 
     /**
-     * @var CacheItemEncoderInterface|null
+     * @var CacheItemEncoderInterface
      */
     private $encoder;
 
@@ -64,9 +64,10 @@ final class DynamoCacheItem implements CacheItemInterface
         $this->key = $key;
         $this->isHit = $isHit;
         $this->expiresAt = $expiresAt;
-        $this->set($value);
         $this->clock = $clock;
         $this->encoder = $encoder;
+
+        $this->set($value);
     }
 
     public function getKey()
@@ -76,7 +77,7 @@ final class DynamoCacheItem implements CacheItemInterface
 
     public function get()
     {
-        return unserialize($this->value);
+        return $this->encoder->decode($this->value);
     }
 
     public function isHit()
@@ -86,7 +87,7 @@ final class DynamoCacheItem implements CacheItemInterface
 
     public function set($value)
     {
-        $this->value = serialize($value);
+        $this->value = $this->encoder->encode($value);
 
         return $this;
     }

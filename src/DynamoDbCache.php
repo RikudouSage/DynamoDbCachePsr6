@@ -13,6 +13,7 @@ use Psr\SimpleCache\CacheInterface;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
+use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
@@ -87,15 +88,17 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         }
         $this->clock = $clock;
 
-        if ($converter === null) {
-            $converter = new CacheItemConverterRegistry();
-        }
-        $this->converter = $converter;
-
         if ($encoder === null) {
             $encoder = new SerializeItemEncoder();
         }
         $this->encoder = $encoder;
+
+        if ($converter === null) {
+            $converter = new CacheItemConverterRegistry(
+                new DefaultCacheItemConverter($this->encoder, $this->clock)
+            );
+        }
+        $this->converter = $converter;
     }
 
     /**
