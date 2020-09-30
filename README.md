@@ -185,7 +185,7 @@ use Aws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 
 $encoder = new JsonItemEncoder(); // with default flags and depth
-$encoder = new JsonItemEncoder(JSON_PRETTY_PRINT, 100); // with custom flags and depth
+$encoder = new JsonItemEncoder(JSON_PRETTY_PRINT, JSON_THROW_ON_ERROR, 100); // with custom encode and decode flags and depth
 
 $cache = new DynamoDbCache(
     'myTable',

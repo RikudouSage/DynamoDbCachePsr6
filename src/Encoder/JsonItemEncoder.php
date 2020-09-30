@@ -9,17 +9,23 @@ final class JsonItemEncoder implements CacheItemEncoderInterface
     /**
      * @var int
      */
-    private $flags;
+    private $encodeFlags;
 
     /**
      * @var int
      */
     private $depth;
 
-    public function __construct(int $flags = 0, int $depth = 512)
+    /**
+     * @var int
+     */
+    private $decodeFlags;
+
+    public function __construct(int $encodeFlags = 0, int $decodeFlags = 0, int $depth = 512)
     {
-        $this->flags = $flags;
+        $this->encodeFlags = $encodeFlags;
         $this->depth = $depth;
+        $this->decodeFlags = $decodeFlags;
     }
 
     public function encode($input): string
@@ -29,7 +35,7 @@ final class JsonItemEncoder implements CacheItemEncoderInterface
         // for themselves if the json extension is loaded
 
         /** @noinspection PhpComposerExtensionStubsInspection */
-        $json = json_encode($input, $this->flags, $this->depth);
+        $json = json_encode($input, $this->encodeFlags, $this->depth);
         if ($json === false) {
             /** @noinspection PhpComposerExtensionStubsInspection */
             throw new RuntimeException('JSON Error: ' . json_last_error_msg());
@@ -41,6 +47,6 @@ final class JsonItemEncoder implements CacheItemEncoderInterface
     public function decode(string $input)
     {
         /** @noinspection PhpComposerExtensionStubsInspection */
-        return json_decode($input, true, $this->depth, $this->flags);
+        return json_decode($input, true, $this->depth, $this->decodeFlags);
     }
 }
