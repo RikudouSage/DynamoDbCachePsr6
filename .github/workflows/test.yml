@@ -6,6 +6,10 @@ jobs:
     name: Test code style
     runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -16,6 +20,10 @@ jobs:
     name: Static analysis
     runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -26,6 +34,10 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -36,6 +48,10 @@ jobs:
     name: Report Coverage
     runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
