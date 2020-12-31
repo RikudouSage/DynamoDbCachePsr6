@@ -18,13 +18,24 @@ PSR-6 or PSR-16 implementation:
 <?php
 
 use Rikudou\DynamoDbCache\DynamoDbCache;
+use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
 use Aws\DynamoDb\DynamoDbClient;
 
 $cache = new DynamoDbCache('dynamoTableName', new DynamoDbClient([]));
 
 // with custom field names
 $cache = new DynamoDbCache('dynamoTableName', new DynamoDbClient([]), 'customPrimaryKeyField', 'customTtlField', 'customValueField');
+
+// using builder
+$cache = DynamoDbCacheBuilder::create('dynamoTableName', new DynamoDbClient([]))
+    ->withPrimaryField('customPrimaryKeyField')
+    ->withTtlField('customTtlField')
+    ->withValueField('customValueField')
+    ->build();
 ```
+
+It's recommended to use the builder for creating new instances. The builder is immutable and every method
+returns a new instance.
 
 The default values for fields are:
 - primary key - `id` (string)
@@ -112,6 +123,8 @@ You can write your own converter for your specific class which includes support 
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterInterface;
 use Psr\Cache\CacheItemInterface;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
+use Rikudou\Clock\Clock;
+use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 
 class MyCacheItemConverter implements CacheItemConverterInterface
 {
@@ -130,7 +143,9 @@ class MyCacheItemConverter implements CacheItemConverterInterface
             $cacheItem->getKey(),
             $cacheItem->isHit(),
             $cacheItem->get(),
-            $cacheItem->getExpirationDate() // this is a custom method from the hypothetical MyCacheItem
+            $cacheItem->getExpirationDate(), // this is a custom method from the hypothetical MyCacheItem
+            new Clock(),
+            new SerializeItemEncoder()
         );
     }
 }
@@ -144,19 +159,14 @@ You then need to register it in the converter and assign the converter to the ca
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Aws\DynamoDb\DynamoDbClient;
+use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
 
 // you don't need to add the default one as well, it will be added automatically if it's missing
 $converter = new CacheItemConverterRegistry(new MyCacheItemConverter());
 $dynamoClient = new DynamoDbClient([]);
-$cache = new DynamoDbCache(
-    'myTable',
-    $dynamoClient,
-    'id',
-    'ttl',
-    'value',
-    null,
-    $converter
-);
+$cache = DynamoDbCacheBuilder::create('myTable', $dynamoClient)
+    ->withConverterRegistry($converter)
+    ->build();
 
 $myOldCache = new MyCacheImplementation();
 $cacheItem = $myOldCache->getItem('test'); // this is now an instance of MyCacheItem
@@ -182,22 +192,16 @@ in other languages (or different php app that doesn't have the same classes), yo
 ```php
 <?php
 use Rikudou\DynamoDbCache\DynamoDbCache;
+use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
 use Aws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 
 $encoder = new JsonItemEncoder(); // with default flags and depth
 $encoder = new JsonItemEncoder(JSON_PRETTY_PRINT, JSON_THROW_ON_ERROR, 100); // with custom encode and decode flags and depth
 
-$cache = new DynamoDbCache(
-    'myTable',
-    new DynamoDbClient([]),
-    'id',
-    'ttl',
-    'value',
-    null,
-    null,
-    $encoder
-);
+$cache = DynamoDbCacheBuilder::create('myTable', new DynamoDbClient([]))
+    ->withEncoder($encoder)
+    ->build();
 ```
 
 Your values will now be saved json encoded in DynamoDB.
