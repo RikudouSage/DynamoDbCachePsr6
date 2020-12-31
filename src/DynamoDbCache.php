@@ -67,6 +67,11 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private $encoder;
 
+    /**
+     * @var string|null
+     */
+    private $prefix;
+
     public function __construct(
         string $tableName,
         DynamoDbClient $client,
@@ -75,7 +80,8 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         string $valueField = 'value',
         ?ClockInterface $clock = null,
         ?CacheItemConverterRegistry $converter = null,
-        ?CacheItemEncoderInterface $encoder = null
+        ?CacheItemEncoderInterface $encoder = null,
+        ?string $prefix = null
     ) {
         $this->tableName = $tableName;
         $this->client = $client;
@@ -99,6 +105,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         }
         $this->converter = $converter;
+        $this->prefix = $prefix;
     }
 
     /**
@@ -110,7 +117,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     public function getItem($key)
     {
-        if ($exception = $this->getExceptionForInvalidKey($key)) {
+        if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
             throw $exception;
         }
 
@@ -118,7 +125,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             $item = $this->client->getItem([
                 'Key' => [
                     $this->primaryField => [
-                        'S' => $key,
+                        'S' => $this->getKey($key),
                     ],
                 ],
                 'TableName' => $this->tableName,
@@ -129,7 +136,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             assert($this->clock->now() instanceof DateTime || $this->clock->now() instanceof DateTimeImmutable);
 
             return new DynamoCacheItem(
-                $key,
+                $this->getKey($key),
                 $data !== null,
                 $data !== null ? $this->encoder->decode($data) : null,
                 ($item[$this->ttlField]['N'] ?? null) !== null
@@ -141,7 +148,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         } catch (DynamoDbException $e) {
             if ($e->getAwsErrorCode() === 'ResourceNotFoundException') {
                 return new DynamoCacheItem(
-                    $key,
+                    $this->getKey($key),
                     false,
                     null,
                     null,
@@ -162,10 +169,12 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     public function getItems(array $keys = [])
     {
-        array_map(function ($key) {
-            if ($exception = $this->getExceptionForInvalidKey($key)) {
+        $keys = array_map(function ($key) {
+            if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
                 throw $exception;
             }
+
+            return $this->getKey($key);
         }, $keys);
         $response = $this->client->batchGetItem([
             'RequestItems' => [
@@ -260,6 +269,8 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     {
         if ($key instanceof DynamoCacheItem) {
             $key = $key->getKey();
+        } else {
+            $key = $this->getKey($key);
         }
 
         if ($exception = $this->getExceptionForInvalidKey($key)) {
@@ -291,10 +302,12 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     public function deleteItems(array $keys)
     {
-        array_map(function ($key) {
-            if ($exception = $this->getExceptionForInvalidKey($key)) {
+        $keys = array_map(function ($key) {
+            if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
                 throw $exception;
             }
+
+            return $this->getKey($key);
         }, $keys);
 
         try {
@@ -547,5 +560,14 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             /** @noinspection PhpParamsInspection */
             return iterator_to_array($iterable);
         }
+    }
+
+    private function getKey(string $key): string
+    {
+        if ($this->prefix !== null) {
+            return $this->prefix . $key;
+        }
+
+        return $key;
     }
 }
