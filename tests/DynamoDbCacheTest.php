@@ -70,6 +70,11 @@ final class DynamoDbCacheTest extends TestCase
         ],
     ];
 
+    /**
+     * Created dynamically in setup
+     */
+    private $itemPoolPrefixed = [];
+
     private $itemPoolSaved = [];
 
     /**
@@ -87,8 +92,24 @@ final class DynamoDbCacheTest extends TestCase
      */
     private $instanceFailure;
 
+    /**
+     * @var DynamoDbCache
+     */
+    private $instancePrefixed;
+
+    /**
+     * @var string
+     */
+    private $prefix;
+
     protected function setUp(): void
     {
+        $this->prefix = 'randomPrefix#';
+        $this->itemPoolPrefixed = array_map(function (array $item): array {
+            $item['id']['S'] = $this->prefix . $item['id']['S'];
+            return $item;
+        }, $this->itemPoolDefault);
+
         $this->instance = new DynamoDbCache('test', $this->getFakeClient($this->itemPoolDefault));
         $this->instanceFailure = new DynamoDbCache('test', $this->getFakeClient(
             $this->itemPoolDefault,
@@ -112,6 +133,17 @@ final class DynamoDbCacheTest extends TestCase
             $idField,
             $ttlField,
             $valueField
+        );
+        $this->instancePrefixed = new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolPrefixed),
+            'id',
+            'ttl',
+            'value',
+            null,
+            null,
+            null,
+            $this->prefix
         );
     }
 
@@ -154,6 +186,43 @@ final class DynamoDbCacheTest extends TestCase
         // dynamo db failure
         $this->expectException(DynamoDbException::class);
         $this->instanceFailure->getItem('test');
+    }
+
+    public function testGetItemPrefixed()
+    {
+        $item = $this->instancePrefixed->getItem('test123');
+        self::assertEquals($this->prefix . 'test123', $item->getKey());
+        self::assertEquals('test', $item->get());
+        self::assertTrue($item->isHit());
+        self::assertEquals(1893452400, $item->getExpiresAt()->getTimestamp());
+        self::assertEquals('s:4:"test";', $item->getRaw());
+
+        // expired item
+        $item = $this->instancePrefixed->getItem('test456');
+        self::assertEquals($this->prefix . 'test456', $item->getKey());
+        self::assertEquals(6, $item->get());
+        self::assertFalse($item->isHit());
+        self::assertEquals(1262300400, $item->getExpiresAt()->getTimestamp());
+        self::assertEquals('i:6;', $item->getRaw());
+
+        // no expiration, serialized object
+        $item = $this->instancePrefixed->getItem('test789');
+        self::assertEquals($this->prefix . 'test789', $item->getKey());
+        self::assertTrue($item->isHit());
+        self::assertNull($item->getExpiresAt());
+        self::assertEquals('O:8:"stdClass":2:{s:14:"randomProperty";s:4:"test";s:15:"randomProperty2";i:8;}', $item->getRaw());
+        $value = $item->get();
+        self::assertInstanceOf(stdClass::class, $value);
+        self::assertEquals('test', $value->randomProperty);
+        self::assertEquals(8, $value->randomProperty2);
+
+        // nonexistent item
+        $item = $this->instancePrefixed->getItem('test852');
+        self::assertEquals($this->prefix . 'test852', $item->getKey());
+        self::assertEquals(null, $item->get());
+        self::assertFalse($item->isHit());
+        self::assertNull($item->getExpiresAt());
+        self::assertEquals('N;', $item->getRaw());
     }
 
     public function testGetItemNonDefaultFields()
@@ -221,6 +290,61 @@ final class DynamoDbCacheTest extends TestCase
         }
     }
 
+    public function testGetItemsPrefixed()
+    {
+        $result = $this->instancePrefixed->getItems([
+            'test123',
+            'test456',
+            'test789',
+            'test852',
+            'test258',
+        ]);
+
+        self::assertCount(5, $result);
+        foreach ($result as $item) {
+            switch ($item->getKey()) {
+                case $this->prefix . 'test123':
+                    self::assertEquals($this->prefix . 'test123', $item->getKey());
+                    self::assertEquals('test', $item->get());
+                    self::assertTrue($item->isHit());
+                    self::assertEquals(1893452400, $item->getExpiresAt()->getTimestamp());
+                    self::assertEquals('s:4:"test";', $item->getRaw());
+                    break;
+                case $this->prefix . 'test456':
+                    self::assertEquals($this->prefix . 'test456', $item->getKey());
+                    self::assertEquals(6, $item->get());
+                    self::assertFalse($item->isHit());
+                    self::assertEquals(1262300400, $item->getExpiresAt()->getTimestamp());
+                    self::assertEquals('i:6;', $item->getRaw());
+                    break;
+                case $this->prefix . 'test789':
+                    self::assertEquals($this->prefix . 'test789', $item->getKey());
+                    self::assertTrue($item->isHit());
+                    self::assertNull($item->getExpiresAt());
+                    self::assertEquals('O:8:"stdClass":2:{s:14:"randomProperty";s:4:"test";s:15:"randomProperty2";i:8;}', $item->getRaw());
+                    $value = $item->get();
+                    self::assertInstanceOf(stdClass::class, $value);
+                    self::assertEquals('test', $value->randomProperty);
+                    self::assertEquals(8, $value->randomProperty2);
+                    break;
+                case $this->prefix . 'test852':
+                    self::assertEquals($this->prefix . 'test852', $item->getKey());
+                    self::assertEquals(null, $item->get());
+                    self::assertFalse($item->isHit());
+                    self::assertNull($item->getExpiresAt());
+                    self::assertEquals('N;', $item->getRaw());
+                    break;
+                case $this->prefix . 'test258':
+                    self::assertEquals($this->prefix . 'test258', $item->getKey());
+                    self::assertEquals(null, $item->get());
+                    self::assertFalse($item->isHit());
+                    self::assertNull($item->getExpiresAt());
+                    self::assertEquals('N;', $item->getRaw());
+                    break;
+            }
+        }
+    }
+
     public function testGetItemsNonDefaultFields()
     {
         $result = $this->instanceCustom->getItems([
@@ -253,6 +377,18 @@ final class DynamoDbCacheTest extends TestCase
         $this->instanceFailure->getItem('test');
     }
 
+    public function testHasItemPrefixed()
+    {
+        self::assertTrue($this->instancePrefixed->hasItem('test123'));
+        self::assertFalse($this->instancePrefixed->hasItem('test456'));
+        self::assertTrue($this->instancePrefixed->hasItem('test789'));
+        self::assertFalse($this->instancePrefixed->hasItem('test852'));
+
+        // dynamo db failure
+        $this->expectException(DynamoDbException::class);
+        $this->instanceFailure->getItem('test');
+    }
+
     public function testHasItemNonDefaultFields()
     {
         self::assertTrue($this->instanceCustom->hasItem('test123'));
@@ -262,6 +398,9 @@ final class DynamoDbCacheTest extends TestCase
     public function testClear()
     {
         self::assertFalse($this->instance->clear());
+        self::assertFalse($this->instanceCustom->clear());
+        self::assertFalse($this->instancePrefixed->clear());
+        self::assertFalse($this->instanceFailure->clear());
     }
 
     public function testDeleteItemDefaultKeys()
@@ -288,6 +427,30 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($this->instance->deleteItem($item));
     }
 
+    public function testDeleteItemPrefixed()
+    {
+        $result = $this->instancePrefixed->deleteItem('test123');
+        self::assertTrue($result);
+
+        $result = $this->instancePrefixed->deleteItem('test456');
+        self::assertTrue($result);
+
+        $result = $this->instancePrefixed->deleteItem('test789');
+        self::assertTrue($result);
+
+        $result = $this->instancePrefixed->deleteItem('test852');
+        self::assertFalse($result);
+
+        $item = $this->instancePrefixed->getItem('test123');
+        self::assertTrue($this->instancePrefixed->deleteItem($item));
+
+        $item = $this->instancePrefixed->getItem('test456');
+        self::assertTrue($this->instancePrefixed->deleteItem($item));
+
+        $item = $this->instancePrefixed->getItem('test852');
+        self::assertFalse($this->instancePrefixed->deleteItem($item));
+    }
+
     public function testDeleteItemNonDefaultKeys()
     {
         $result = $this->instanceCustom->deleteItem('test123');
@@ -308,6 +471,23 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($result);
 
         $result = $this->instance->deleteItems([ // simulate throughput exceeded
+            'test852',
+            'test258',
+        ]);
+        self::assertFalse($result);
+    }
+
+    public function testDeleteItemsPrefixed()
+    {
+        $result = $this->instancePrefixed->deleteItems([
+            'test123',
+            'test456',
+            'test789',
+            'test852',
+        ]);
+        self::assertTrue($result);
+
+        $result = $this->instancePrefixed->deleteItems([ // simulate throughput exceeded
             'test852',
             'test258',
         ]);
@@ -353,6 +533,28 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($result);
 
         $result = $this->instance->save($this->getEmptyBaseCacheItem());
+        self::assertTrue($result);
+    }
+
+    public function testSavePrefixed()
+    {
+        $cacheItem = $this->instancePrefixed->getItem('test654');
+        // initial condition check
+        self::assertFalse($cacheItem->isHit());
+        self::assertNull($cacheItem->get());
+        // assign values
+        $cacheItem->set('test654');
+        $cacheItem->expiresAt(new DateTime('2030-01-01 15:30:45'));
+        self::assertFalse($cacheItem->isHit());
+
+        $result = $this->instancePrefixed->save($cacheItem);
+        self::assertTrue($result);
+
+        self::assertFalse($cacheItem->isHit());
+        self::assertEquals('test654', $cacheItem->get());
+        self::assertEquals('2030-01-01 15:30:45', $cacheItem->getExpiresAt()->format('Y-m-d H:i:s'));
+
+        $result = $this->instancePrefixed->save($this->getEmptyBaseCacheItem());
         self::assertTrue($result);
     }
 
@@ -435,6 +637,16 @@ final class DynamoDbCacheTest extends TestCase
         self::assertEquals('defaultValue', $this->instance->get('test852', 'defaultValue'));
     }
 
+    public function testGetPrefixed()
+    {
+        self::assertEquals('test', $this->instancePrefixed->get('test123'));
+        self::assertNull($this->instancePrefixed->get('test456'));
+        self::assertEquals('defaultValue', $this->instancePrefixed->get('test456', 'defaultValue'));
+        self::assertInstanceOf(stdClass::class, $this->instancePrefixed->get('test789'));
+        self::assertNull($this->instancePrefixed->get('test852'));
+        self::assertEquals('defaultValue', $this->instancePrefixed->get('test852', 'defaultValue'));
+    }
+
     public function testSet()
     {
         $count = 0;
@@ -466,12 +678,54 @@ final class DynamoDbCacheTest extends TestCase
         );
     }
 
+    public function testSetPrefixed()
+    {
+        $count = 0;
+        self::assertCount($count, $this->itemPoolSaved);
+
+        self::assertTrue($this->instancePrefixed->set('test', 'test'));
+        self::assertCount(++$count, $this->itemPoolSaved);
+
+        $instance = new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolPrefixed),
+            'id',
+            'ttl',
+            'value',
+            new TestClock(new DateTime('2030-01-01 15:00:00')),
+            null,
+            null,
+            $this->prefix
+        );
+        self::assertTrue($instance->set('test2', 'test', 3600));
+        self::assertCount(++$count, $this->itemPoolSaved);
+        self::assertEquals(
+            '2030-01-01 16:00:00',
+            (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
+        );
+
+        self::assertTrue($instance->set('test3', 'test', new DateInterval('P1DT3S')));
+        self::assertCount(++$count, $this->itemPoolSaved);
+        self::assertEquals(
+            '2030-01-02 16:00:03',
+            (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
+        );
+    }
+
     public function testDelete()
     {
         self::assertTrue($this->instance->delete('test123'));
         self::assertTrue($this->instance->delete('test456'));
         self::assertTrue($this->instance->delete('test789'));
         self::assertFalse($this->instance->delete('test852'));
+    }
+
+    public function testDeletePrefix()
+    {
+        self::assertTrue($this->instancePrefixed->delete('test123'));
+        self::assertTrue($this->instancePrefixed->delete('test456'));
+        self::assertTrue($this->instancePrefixed->delete('test789'));
+        self::assertFalse($this->instancePrefixed->delete('test852'));
     }
 
     public function testGetMultiple()
@@ -509,6 +763,41 @@ final class DynamoDbCacheTest extends TestCase
         self::assertEquals('defaultValue', $result['test852']);
     }
 
+    public function testGetMultiplePrefixed()
+    {
+        $result = $this->instancePrefixed->getMultiple([
+            'test123',
+            'test456',
+            'test789',
+            'test852',
+            'test258',
+        ]);
+
+        self::assertCount(5, $result);
+
+        self::assertArrayHasKey('test123', $result);
+        self::assertArrayHasKey('test456', $result);
+        self::assertArrayHasKey('test789', $result);
+        self::assertArrayHasKey('test852', $result);
+        self::assertArrayHasKey('test258', $result);
+
+        self::assertEquals('test', $result['test123']);
+        self::assertNull($result['test456']);
+        self::assertInstanceOf(stdClass::class, $result['test789']);
+        self::assertNull($result['test852']);
+        self::assertNull($result['test258']);
+
+        $result = $this->instancePrefixed->getMultiple([
+            'test456',
+            'test852',
+        ], 'defaultValue');
+
+        self::assertArrayHasKey('test456', $result);
+        self::assertArrayHasKey('test852', $result);
+        self::assertEquals('defaultValue', $result['test456']);
+        self::assertEquals('defaultValue', $result['test852']);
+    }
+
     public function testSetMultiple()
     {
         self::assertCount(0, $this->itemPoolSaved);
@@ -524,12 +813,15 @@ final class DynamoDbCacheTest extends TestCase
         foreach ($this->itemPoolSaved as $item) {
             switch ($item['id']['S']) {
                 case 'test147':
+                    self::assertEquals('test147', $item['id']['S']);
                     self::assertEquals('s:4:"test";', $item['value']['S']);
                     break;
                 case 'test258':
+                    self::assertEquals('test258', $item['id']['S']);
                     self::assertEquals('s:5:"test2";', $item['value']['S']);
                     break;
                 case 'test369':
+                    self::assertEquals('test369', $item['id']['S']);
                     self::assertEquals('s:5:"test3";', $item['value']['S']);
                     break;
             }
@@ -542,6 +834,68 @@ final class DynamoDbCacheTest extends TestCase
             'ttl',
             'value',
             new TestClock(new DateTimeImmutable('2030-01-01 15:00:00'))
+        );
+
+        $this->itemPoolSaved = [];
+        $instance->setMultiple($data, 3600);
+        self::assertCount(3, $this->itemPoolSaved);
+        foreach ($this->itemPoolSaved as $item) {
+            self::assertEquals(
+                '2030-01-01 16:00:00',
+                (new DateTime())->setTimestamp($item['ttl']['N'])->format('Y-m-d H:i:s')
+            );
+        }
+
+        $this->itemPoolSaved = [];
+        $instance->setMultiple($data, new DateInterval('P1DT10M'));
+        self::assertCount(3, $this->itemPoolSaved);
+        foreach ($this->itemPoolSaved as $item) {
+            self::assertEquals(
+                '2030-01-02 15:10:00',
+                (new DateTime())->setTimestamp($item['ttl']['N'])->format('Y-m-d H:i:s')
+            );
+        }
+    }
+
+    public function testSetMultiplePrefixed()
+    {
+        self::assertCount(0, $this->itemPoolSaved);
+        $data = [
+            'test147' => 'test',
+            'test258' => 'test2',
+            'test369' => 'test3',
+        ];
+
+        self::assertTrue($this->instancePrefixed->setMultiple($data));
+        self::assertCount(3, $this->itemPoolSaved);
+
+        foreach ($this->itemPoolSaved as $item) {
+            switch ($item['id']['S']) {
+                case $this->prefix . 'test147':
+                    self::assertEquals($this->prefix . 'test147', $item['id']['S']);
+                    self::assertEquals('s:4:"test";', $item['value']['S']);
+                    break;
+                case $this->prefix . 'test258':
+                    self::assertEquals($this->prefix . 'test258', $item['id']['S']);
+                    self::assertEquals('s:5:"test2";', $item['value']['S']);
+                    break;
+                case $this->prefix . 'test369':
+                    self::assertEquals($this->prefix . 'test369', $item['id']['S']);
+                    self::assertEquals('s:5:"test3";', $item['value']['S']);
+                    break;
+            }
+        }
+
+        $instance = new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolPrefixed),
+            'id',
+            'ttl',
+            'value',
+            new TestClock(new DateTimeImmutable('2030-01-01 15:00:00')),
+            null,
+            null,
+            $this->prefix
         );
 
         $this->itemPoolSaved = [];
@@ -580,12 +934,35 @@ final class DynamoDbCacheTest extends TestCase
         ]));
     }
 
+    public function testDeleteMultiplePrefixed()
+    {
+        self::assertTrue($this->instancePrefixed->deleteMultiple([
+            'test123',
+            'test456',
+            'test789',
+        ]));
+
+        // simulate error
+        self::assertFalse($this->instancePrefixed->deleteMultiple([
+            'test258',
+            'test852',
+        ]));
+    }
+
     public function testHas()
     {
         self::assertTrue($this->instance->has('test123'));
         self::assertFalse($this->instance->has('test456'));
         self::assertTrue($this->instance->has('test789'));
         self::assertFalse($this->instance->has('test852'));
+    }
+
+    public function testHasPrefixed()
+    {
+        self::assertTrue($this->instancePrefixed->has('test123'));
+        self::assertFalse($this->instancePrefixed->has('test456'));
+        self::assertTrue($this->instancePrefixed->has('test789'));
+        self::assertFalse($this->instancePrefixed->has('test852'));
     }
 
     public function testInvalidKeys()

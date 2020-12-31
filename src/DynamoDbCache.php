@@ -247,7 +247,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     public function hasItem($key)
     {
-        return $this->getItem($this->getKey($key))->isHit();
+        return $this->getItem($key)->isHit();
     }
 
     /**
