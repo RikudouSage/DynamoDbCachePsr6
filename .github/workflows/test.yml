@@ -4,8 +4,12 @@ on: [push, pull_request]
 jobs:
   code_style:
     name: Test code style
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -14,8 +18,12 @@ jobs:
         run: composer fixer -- --dry-run
   static_analysis:
     name: Static analysis
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -24,8 +32,12 @@ jobs:
         run: composer phpstan
   tests:
     name: Tests
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
@@ -34,8 +46,12 @@ jobs:
         run: composer phpunit
   coverage:
     name: Report Coverage
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Install Dependencies
