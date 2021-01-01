@@ -109,6 +109,24 @@ function get(string $key): string
 }
 ```
 
+## Prefixing
+
+You can automatically prefix all keys in DynamoDB by using the prefix configuration like this:
+
+```php
+<?php
+
+use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
+use Aws\DynamoDb\DynamoDbClient;
+
+$cache = DynamoDbCacheBuilder::create('myTable', new DynamoDbClient([]))
+    ->withPrefix('myCustomPrefix#')
+    ->build();
+
+$item = $cache->getItem('key1'); // fetches an item with key myCustomPrefix#key1
+$key = $item->getKey(); // $key holds the full key including prefix, myCustomPrefix#key1
+```
+
 ## Converters
 
 This implementation supports all instances of `\Psr\Cache\CacheItemInterface` with the use of converters which
