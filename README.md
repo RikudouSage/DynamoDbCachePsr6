@@ -1,4 +1,4 @@
-[![Tests](https://github.com/RikudouSage/DynamoDbCachePsr6/workflows/Tests/badge.svg)](https://github.com/RikudouSage/DynamoDbCachePsr6/actions?query=workflow%3ATests)
+[![Tests](https://github.com/RikudouSage/DynamoDbCachePsr6/actions/workflows/test.yaml/badge.svg)](https://github.com/RikudouSage/DynamoDbCachePsr6/actions/workflows/test.yaml)
 [![Coverage Status](https://coveralls.io/repos/github/RikudouSage/DynamoDbCachePsr6/badge.svg?branch=master)](https://coveralls.io/github/RikudouSage/DynamoDbCachePsr6?branch=master)
 [![Download](https://img.shields.io/packagist/dt/rikudou/psr6-dynamo-db.svg)](https://packagist.org/packages/rikudou/psr6-dynamo-db)
 
