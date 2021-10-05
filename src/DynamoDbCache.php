@@ -188,10 +188,14 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         assert(method_exists($this->clock->now(), 'setTimestamp'));
         foreach ($response->getResponses()[$this->tableName] as $item) {
             if (!isset($item[$this->primaryField]) || $item[$this->primaryField]->getS() === null) {
+                // @codeCoverageIgnoreStart
                 continue;
+                // @codeCoverageIgnoreEnd
             }
             if (!isset($item[$this->valueField]) || $item[$this->valueField]->getS() === null) {
+                // @codeCoverageIgnoreStart
                 continue;
+                // @codeCoverageIgnoreEnd
             }
             $result[] = new DynamoCacheItem(
                 $item[$this->primaryField]->getS(),
@@ -349,8 +353,10 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             $this->client->putItem($data);
 
             return true;
+            // @codeCoverageIgnoreStart
         } catch (ClientException $e) {
             return false;
+            // @codeCoverageIgnoreEnd
         }
     }
 
