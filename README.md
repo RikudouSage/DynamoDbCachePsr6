@@ -22,7 +22,7 @@ PSR-6 or PSR-16 implementation:
 
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 
 $cache = new DynamoDbCache('dynamoTableName', new DynamoDbClient([]));
 
@@ -51,14 +51,13 @@ You must create the DynamoDB table before using this library.
 
 ```php
 <?php
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 
 function get(string $key): string
 {
     $dynamoDbClient = new DynamoDbClient([
         'region' => 'eu-central-1',
-        'version' => 'latest'
     ]);
     $cache = new DynamoDbCache('cache', $dynamoDbClient); // the default field names are used - id, ttl and value
     
@@ -85,14 +84,13 @@ function get(string $key): string
 ```php
 <?php
 
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 
 function get(string $key): string
 {
     $dynamoDbClient = new DynamoDbClient([
         'region' => 'eu-central-1',
-        'version' => 'latest'
     ]);
     $cache = new DynamoDbCache('cache', $dynamoDbClient); // the default field names are used - id, ttl and value
 
@@ -120,7 +118,7 @@ You can automatically prefix all keys in DynamoDB by using the prefix configurat
 <?php
 
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 
 $cache = DynamoDbCacheBuilder::create('myTable', new DynamoDbClient([]))
     ->withPrefix('myCustomPrefix#')
@@ -179,7 +177,7 @@ You then need to register it in the converter and assign the converter to the ca
 
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\DynamoDbCache;
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
 
 // you don't need to add the default one as well, it will be added automatically if it's missing
@@ -214,7 +212,7 @@ in other languages (or different php app that doesn't have the same classes), yo
 <?php
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 
 $encoder = new JsonItemEncoder(); // with default flags and depth
