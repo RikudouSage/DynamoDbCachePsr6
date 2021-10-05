@@ -2,11 +2,12 @@
 
 namespace Rikudou\DynamoDbCache;
 
-use Aws\DynamoDb\DynamoDbClient;
-use Aws\DynamoDb\Exception\DynamoDbException;
+use AsyncAws\Core\Exception\Http\ClientException;
+use AsyncAws\Core\Exception\Http\HttpException;
+use AsyncAws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\ValueObject\AttributeValue;
+use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
-use DateTime;
-use DateTimeImmutable;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -16,6 +17,7 @@ use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
+use Rikudou\DynamoDbCache\Exception\CacheItemNotFoundException;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
@@ -122,41 +124,33 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         }
 
         try {
-            $item = $this->client->getItem([
-                'Key' => [
-                    $this->primaryField => [
-                        'S' => $this->getKey($key),
-                    ],
-                ],
-                'TableName' => $this->tableName,
-            ]);
-            $item = $item->get('Item');
-            $data = $item[$this->valueField]['S'] ?? null;
+            $item = $this->getRawItem($this->getKey($key));
+            if (!isset($item[$this->valueField])) {
+                throw new CacheItemNotFoundException();
+            }
+            $data = $item[$this->valueField]->getS() ?? null;
 
-            assert($this->clock->now() instanceof DateTime || $this->clock->now() instanceof DateTimeImmutable);
+            assert(method_exists($this->clock->now(), 'setTimestamp'));
 
             return new DynamoCacheItem(
                 $this->getKey($key),
                 $data !== null,
                 $data !== null ? $this->encoder->decode($data) : null,
-                ($item[$this->ttlField]['N'] ?? null) !== null
-                    ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
+                isset($item[$this->ttlField]) && $item[$this->ttlField]->getN() !== null
+                    ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]->getN())
                     : null,
                 $this->clock,
                 $this->encoder
             );
-        } catch (DynamoDbException $e) {
-            if ($e->getAwsErrorCode() === 'ResourceNotFoundException') {
-                return new DynamoCacheItem(
-                    $this->getKey($key),
-                    false,
-                    null,
-                    null,
-                    $this->clock,
-                    $this->encoder
-                );
-            }
-            throw $e;
+        } catch (CacheItemNotFoundException $e) {
+            return new DynamoCacheItem(
+                $this->getKey($key),
+                false,
+                null,
+                null,
+                $this->clock,
+                $this->encoder
+            );
         }
     }
 
@@ -178,44 +172,41 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         }, $keys);
         $response = $this->client->batchGetItem([
             'RequestItems' => [
-                $this->tableName => [
+                $this->tableName => new KeysAndAttributes([
                     'Keys' => array_map(function ($key) {
                         return [
-                            $this->primaryField => [
+                            $this->primaryField => new AttributeValue([
                                 'S' => $key,
-                            ],
+                            ]),
                         ];
                     }, $keys),
-                ],
+                ]),
             ],
         ]);
 
         $result = [];
-        assert($this->clock->now() instanceof DateTime || $this->clock->now() instanceof DateTimeImmutable);
-        foreach ($response->get('Responses')[$this->tableName] as $item) {
+        assert(method_exists($this->clock->now(), 'setTimestamp'));
+        foreach ($response->getResponses()[$this->tableName] as $item) {
+            if (!isset($item[$this->primaryField]) || $item[$this->primaryField]->getS() === null) {
+                // @codeCoverageIgnoreStart
+                continue;
+                // @codeCoverageIgnoreEnd
+            }
+            if (!isset($item[$this->valueField]) || $item[$this->valueField]->getS() === null) {
+                // @codeCoverageIgnoreStart
+                continue;
+                // @codeCoverageIgnoreEnd
+            }
             $result[] = new DynamoCacheItem(
-                $item[$this->primaryField]['S'],
+                $item[$this->primaryField]->getS(),
                 true,
-                $this->encoder->decode($item[$this->valueField]['S']),
-                ($item[$this->ttlField]['N'] ?? null) !== null
-                    ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]['N'])
+                $this->encoder->decode($item[$this->valueField]->getS()),
+                isset($item[$this->ttlField]) && $item[$this->ttlField]->getN() !== null
+                    ? $this->clock->now()->setTimestamp((int) $item[$this->ttlField]->getN())
                     : null,
                 $this->clock,
                 $this->encoder
             );
-        }
-        foreach ($response->get('UnprocessedKeys')[$this->tableName] ?? [] as $item) {
-            $unprocessedKeys = $item['Keys'];
-            foreach ($unprocessedKeys as $key) {
-                $result[] = new DynamoCacheItem(
-                    $key['S'],
-                    false,
-                    null,
-                    null,
-                    $this->clock,
-                    $this->encoder
-                );
-            }
         }
 
         if (count($result) !== count($keys)) {
@@ -261,6 +252,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     /**
      * @param string|DynamoCacheItem $key
      *
+     * @throws HttpException
      * @throws InvalidArgumentException
      *
      * @return bool
@@ -277,25 +269,25 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             throw $exception;
         }
 
-        try {
-            $this->client->deleteItem([
-                'Key' => [
-                    $this->primaryField => [
-                        'S' => $key,
-                    ],
-                ],
-                'TableName' => $this->tableName,
-            ]);
-
-            return true;
-        } catch (DynamoDbException $e) {
+        $item = $this->getRawItem($key);
+        if (!isset($item[$this->valueField])) {
             return false;
         }
+
+        return $this->client->deleteItem([
+            'Key' => [
+                $this->primaryField => [
+                    'S' => $key,
+                ],
+            ],
+            'TableName' => $this->tableName,
+        ])->resolve();
     }
 
     /**
      * @param string[] $keys
      *
+     * @throws HttpException
      * @throws InvalidArgumentException
      *
      * @return bool
@@ -310,27 +302,21 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             return $this->getKey($key);
         }, $keys);
 
-        try {
-            $this->client->batchWriteItem([
-                'RequestItems' => [
-                    $this->tableName => array_map(function ($key) {
-                        return [
-                            'DeleteRequest' => [
-                                'Key' => [
-                                    $this->primaryField => [
-                                        'S' => $key,
-                                    ],
+        return $this->client->batchWriteItem([
+            'RequestItems' => [
+                $this->tableName => array_map(function ($key) {
+                    return [
+                        'DeleteRequest' => [
+                            'Key' => [
+                                $this->primaryField => [
+                                    'S' => $key,
                                 ],
                             ],
-                        ];
-                    }, $keys),
-                ],
-            ]);
-
-            return true;
-        } catch (DynamoDbException $e) {
-            return false;
-        }
+                        ],
+                    ];
+                }, $keys),
+            ],
+        ])->resolve();
     }
 
     /**
@@ -367,8 +353,10 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             $this->client->putItem($data);
 
             return true;
-        } catch (DynamoDbException $e) {
+            // @codeCoverageIgnoreStart
+        } catch (ClientException $e) {
             return false;
+            // @codeCoverageIgnoreEnd
         }
     }
 
@@ -569,5 +557,22 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         }
 
         return $key;
+    }
+
+    /**
+     * @return array<string, AttributeValue>
+     */
+    private function getRawItem(string $key): array
+    {
+        $item = $this->client->getItem([
+            'Key' => [
+                $this->primaryField => [
+                    'S' => $key,
+                ],
+            ],
+            'TableName' => $this->tableName,
+        ]);
+
+        return $item->getItem();
     }
 }
