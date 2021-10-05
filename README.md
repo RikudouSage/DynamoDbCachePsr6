@@ -5,6 +5,9 @@
 Library for storing cache in DynamoDB implementing the PSR-6 and PSR-16 interfaces.
 See also [Symfony bundle](https://github.com/RikudouSage/DynamoDbCachePsr6Bundle) of this library.
 
+Since version 2 this library uses the lightweight [async-aws/dynamo-db](https://github.com/async-aws/dynamo-db)
+instead of the full AWS SDK.
+
 ## Installation
 
 `composer require rikudou/psr6-dynamo-db`
