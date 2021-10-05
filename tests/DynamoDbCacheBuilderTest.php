@@ -2,7 +2,7 @@
 
 namespace Rikudou\Tests\DynamoDbCache;
 
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use ReflectionObject;
 use Rikudou\Clock\Clock;
 use Rikudou\Clock\ClockInterface;
@@ -24,7 +24,6 @@ class DynamoDbCacheBuilderTest extends TestCase
     {
         $this->instance = DynamoDbCacheBuilder::create('test', new DynamoDbClient([
             'region' => 'eu-central-1',
-            'version' => 'latest',
         ]));
     }
 
@@ -32,7 +31,6 @@ class DynamoDbCacheBuilderTest extends TestCase
     {
         $client = new DynamoDbClient([
             'region' => 'eu-central-1',
-            'version' => 'latest',
         ]);
         $instance = DynamoDbCacheBuilder::create('test', $client);
         $result = $this->getBuiltData($instance->build());

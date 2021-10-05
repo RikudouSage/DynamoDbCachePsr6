@@ -2,7 +2,7 @@
 
 namespace Rikudou\DynamoDbCache;
 
-use Aws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\DynamoDbClient;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;

@@ -3,8 +3,6 @@
 namespace Rikudou\DynamoDbCache;
 
 use DateInterval;
-use DateTime;
-use DateTimeImmutable;
 use DateTimeInterface;
 use Psr\Cache\CacheItemInterface;
 use Rikudou\Clock\ClockInterface;
@@ -118,7 +116,7 @@ final class DynamoCacheItem implements CacheItemInterface
                 throw new InvalidArgumentException('The argument must be an int, DateInterval or null');
             }
 
-            assert($now instanceof DateTime || $now instanceof DateTimeImmutable);
+            assert(method_exists($now, 'add'));
             $this->expiresAt = $now->add($time);
         }
 
