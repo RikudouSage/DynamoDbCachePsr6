@@ -590,6 +590,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 
     private function generateCompliantKey(string $key): string
     {
+        $key = $this->getKey($key);
         $suffix = '_trunc_' . md5($key);
         return substr(
             $this->getKey($key),
