@@ -109,6 +109,11 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         }
         $this->converter = $converter;
+        if ($prefix !== null && strlen($prefix) >= self::MAX_KEY_LENGTH) {
+            throw new LogicException(
+                sprintf('The prefix cannot be longer or equal to the maximum length: %d bytes', self::MAX_KEY_LENGTH)
+            );
+        }
         $this->prefix = $prefix;
     }
 
@@ -585,17 +590,11 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 
     private function generateCompliantKey(string $key): string
     {
-        $key = $this->getKey(base64_encode(md5($key)));
-        if (strlen($key) > self::MAX_KEY_LENGTH) {
-            throw new LogicException(
-                sprintf(
-                    'The key is too long even after truncating it, your prefix is probably too long. Max key length: %d. Key length after truncating including prefix: %d.',
-                    self::MAX_KEY_LENGTH,
-                    strlen($key),
-                ),
-            );
-        }
-
-        return $key;
+        $suffix = '_trunc_' . md5($key);
+        return substr(
+            $this->getKey($key),
+            0,
+            self::MAX_KEY_LENGTH - strlen($suffix)
+        ) . $suffix;
     }
 }

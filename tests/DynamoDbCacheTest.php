@@ -298,14 +298,12 @@ final class DynamoDbCacheTest extends TestCase
         $item = $this->instance->getItem($key);
         self::assertNotEquals($key, $item->getKey());
         self::assertLessThanOrEqual(2048, strlen($item->getKey()));
-        self::assertEquals(base64_encode(md5($key)), $item->getKey());
 
         $item = $this->instancePrefixed->getItem($key);
         self::assertNotEquals($key, $item->getKey());
         self::assertNotEquals($this->prefix . $key, $item->getKey());
         self::assertStringStartsWith($this->prefix, $item->getKey());
         self::assertLessThanOrEqual(2048, strlen($item->getKey()));
-        self::assertEquals($this->prefix . base64_encode(md5($key)), $item->getKey());
 
         $key = bin2hex(random_bytes(1023));
 
@@ -314,7 +312,8 @@ final class DynamoDbCacheTest extends TestCase
         $item = $this->instancePrefixed->getItem($key);
         self::assertNotEquals($key, $item->getKey());
 
-        $this->instancePrefixed = new DynamoDbCache(
+        $this->expectException(LogicException::class);
+        new DynamoDbCache(
             'test',
             $this->getFakeClient($this->itemPoolPrefixed),
             'id',
@@ -325,9 +324,6 @@ final class DynamoDbCacheTest extends TestCase
             null,
             bin2hex(random_bytes(1024)),
         );
-
-        $this->expectException(LogicException::class);
-        $this->instancePrefixed->getItem('a');
     }
 
     public function testGetItemsPrefixed()
