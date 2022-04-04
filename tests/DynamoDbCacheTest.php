@@ -18,6 +18,7 @@ use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
 use DateTime;
 use DateTimeImmutable;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Log\NullLogger;
@@ -285,6 +286,44 @@ final class DynamoDbCacheTest extends TestCase
                     break;
             }
         }
+    }
+
+    /**
+     * @see https://github.com/RikudouSage/DynamoDbCachePsr6/issues/19
+     */
+    public function testGetItemKeyTooLong()
+    {
+        $key = bin2hex(random_bytes(1025));
+
+        $item = $this->instance->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+        self::assertLessThanOrEqual(2048, strlen($item->getKey()));
+
+        $item = $this->instancePrefixed->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+        self::assertNotEquals($this->prefix . $key, $item->getKey());
+        self::assertStringStartsWith($this->prefix, $item->getKey());
+        self::assertLessThanOrEqual(2048, strlen($item->getKey()));
+
+        $key = bin2hex(random_bytes(1023));
+
+        $item = $this->instance->getItem($key);
+        self::assertEquals($key, $item->getKey());
+        $item = $this->instancePrefixed->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+
+        $this->expectException(LogicException::class);
+        new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolPrefixed),
+            'id',
+            'ttl',
+            'value',
+            null,
+            null,
+            null,
+            bin2hex(random_bytes(1024)),
+        );
     }
 
     public function testGetItemsPrefixed()
