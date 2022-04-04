@@ -26,7 +26,6 @@ class DynamoDbTableCreatorTest extends TestCase
 
     protected function setUp(): void
     {
-        var_dump(getenv('RIKUDOU_TEST_DYNAMO_TABLE'));exit;
         if (
             !getenv('AWS_ACCESS_KEY_ID')
             || !getenv('AWS_SECRET_ACCESS_KEY')
