@@ -8,6 +8,7 @@ use AsyncAws\DynamoDb\DynamoDbClient;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
+use LogicException;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -23,6 +24,7 @@ use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 {
     private const RESERVED_CHARACTERS = '{}()/\@:';
+    private const MAX_KEY_LENGTH = 2048;
 
     /**
      * @var string
@@ -123,8 +125,13 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             throw $exception;
         }
 
+        $finalKey = $this->getKey($key);
+        if (strlen($finalKey) > self::MAX_KEY_LENGTH) {
+            $finalKey = $this->generateCompliantKey($key);
+        }
+
         try {
-            $item = $this->getRawItem($this->getKey($key));
+            $item = $this->getRawItem($finalKey);
             if (!isset($item[$this->valueField])) {
                 throw new CacheItemNotFoundException();
             }
@@ -133,7 +140,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             assert(method_exists($this->clock->now(), 'setTimestamp'));
 
             return new DynamoCacheItem(
-                $this->getKey($key),
+                $finalKey,
                 $data !== null,
                 $data !== null ? $this->encoder->decode($data) : null,
                 isset($item[$this->ttlField]) && $item[$this->ttlField]->getN() !== null
@@ -144,7 +151,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         } catch (CacheItemNotFoundException $e) {
             return new DynamoCacheItem(
-                $this->getKey($key),
+                $finalKey,
                 false,
                 null,
                 null,
@@ -574,5 +581,21 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         ]);
 
         return $item->getItem();
+    }
+
+    private function generateCompliantKey(string $key): string
+    {
+        $key = $this->getKey(base64_encode(md5($key)));
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
+            throw new LogicException(
+                sprintf(
+                    'The key is too long even after truncating it, your prefix is probably too long. Max key length: %d. Key length after truncating including prefix: %d.',
+                    self::MAX_KEY_LENGTH,
+                    strlen($key),
+                ),
+            );
+        }
+
+        return $key;
     }
 }
