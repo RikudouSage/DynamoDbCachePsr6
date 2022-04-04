@@ -129,13 +129,13 @@ final class DynamoDbTableCreator implements DynamoDbTableCreatorInterface
     private function isActive(): bool
     {
         if (!$this->exists()) {
-            return false;
+            return false; // @codeCoverageIgnore
         }
         $result = $this->awsClient->describeTable([
             'TableName' => $this->tableName,
         ])->getTable();
         if ($result === null) {
-            return false;
+            return false; // @codeCoverageIgnore
         }
 
         return $result->getTableStatus() === TableStatus::ACTIVE;
