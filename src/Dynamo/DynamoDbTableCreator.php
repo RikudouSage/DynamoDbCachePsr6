@@ -9,11 +9,8 @@ use AsyncAws\DynamoDb\Exception\ResourceNotFoundException;
 use ReflectionObject;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 
-final class DynamoDbTableCreator
+final class DynamoDbTableCreator implements DynamoDbTableCreatorInterface
 {
-    public const MODE_PROVISIONED = 'PROVISIONED';
-    public const MODE_PAY_PER_REQUEST = 'PAY_PER_REQUEST';
-
     /**
      * @var DynamoDbCache
      */
@@ -39,11 +36,6 @@ final class DynamoDbTableCreator
      */
     private $ttlField;
 
-    /**
-     * @var string
-     */
-    private $valueField;
-
     public function __construct(DynamoDbCache $cache)
     {
         $this->cache = $cache;
@@ -63,7 +55,7 @@ final class DynamoDbTableCreator
         }
     }
 
-    public function create(string $mode = self::MODE_PAY_PER_REQUEST): bool
+    public function create(string $mode = self::MODE_PAY_PER_REQUEST, bool $throw = true): bool
     {
         try {
             $this->awsClient->createTable([
@@ -95,14 +87,18 @@ final class DynamoDbTableCreator
 
             return true;
         } catch (ClientException $e) {
+            if ($throw) {
+                throw $e;
+            }
+
             return false;
         }
     }
 
-    public function createIfNotExists(string $mode = self::MODE_PAY_PER_REQUEST): bool
+    public function createIfNotExists(string $mode = self::MODE_PAY_PER_REQUEST, bool $throw = true): bool
     {
         if (!$this->exists()) {
-            return $this->create($mode);
+            return $this->create($mode, $throw);
         }
 
         return true;
@@ -128,7 +124,6 @@ final class DynamoDbTableCreator
         $this->awsClient = $reflectionClient->getValue($this->cache);
         $this->primaryField = $reflectionPrimaryField->getValue($this->cache);
         $this->ttlField = $reflectionTtlField->getValue($this->cache);
-        $this->valueField = $reflectionValueField->getValue($this->cache);
     }
 
     private function isActive(): bool
