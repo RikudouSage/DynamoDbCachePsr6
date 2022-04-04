@@ -18,6 +18,7 @@ use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
 use DateTime;
 use DateTimeImmutable;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Log\NullLogger;

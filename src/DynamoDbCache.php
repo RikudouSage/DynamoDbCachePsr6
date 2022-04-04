@@ -8,6 +8,7 @@ use AsyncAws\DynamoDb\DynamoDbClient;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
+use LogicException;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -22,6 +23,7 @@ use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 {
+    private const MAX_KEY_LENGTH = 2048;
     private const RESERVED_CHARACTERS = '{}()/\@:';
 
     /**
@@ -107,6 +109,10 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         }
         $this->converter = $converter;
+
+        if ($prefix && strlen($prefix) >= self::MAX_KEY_LENGTH) {
+            throw new LogicException('Prefix must not be longer than maximum key length');
+        }
         $this->prefix = $prefix;
     }
 
@@ -552,8 +558,13 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 
     private function getKey(string $key): string
     {
-        if ($this->prefix !== null) {
-            return $this->prefix . $key;
+        if ($this->prefix) {
+            $key = $this->prefix . $key;
+        }
+
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
+            $suffix = '_trunc_' . md5($key);
+            $key = substr($key, 0, self::MAX_KEY_LENGTH - strlen($suffix)) . $suffix;
         }
 
         return $key;
