@@ -2,8 +2,10 @@
 
 namespace Rikudou\DynamoDbCache\Dynamo;
 
-use Aws\DynamoDb\DynamoDbClient;
-use Aws\DynamoDb\Exception\DynamoDbException;
+use AsyncAws\Core\Exception\Http\ClientException;
+use AsyncAws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\Enum\TableStatus;
+use AsyncAws\DynamoDb\Exception\ResourceNotFoundException;
 use ReflectionObject;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 
@@ -56,11 +58,8 @@ final class DynamoDbTableCreator
             ]);
 
             return true;
-        } catch (DynamoDbException $e) {
-            if ($e->getAwsErrorCode() === 'ResourceNotFoundException') {
-                return false;
-            }
-            throw $e;
+        } catch (ResourceNotFoundException $e) {
+            return false;
         }
     }
 
@@ -95,7 +94,7 @@ final class DynamoDbTableCreator
             ]);
 
             return true;
-        } catch (DynamoDbException $e) {
+        } catch (ClientException $e) {
             return false;
         }
     }
@@ -139,8 +138,11 @@ final class DynamoDbTableCreator
         }
         $result = $this->awsClient->describeTable([
             'TableName' => $this->tableName,
-        ])->get('Table');
+        ])->getTable();
+        if ($result === null) {
+            return false;
+        }
 
-        return $result['TableStatus'] === 'ACTIVE';
+        return $result->getTableStatus() === TableStatus::ACTIVE;
     }
 }
