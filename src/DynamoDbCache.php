@@ -592,6 +592,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     {
         $key = $this->getKey($key);
         $suffix = '_trunc_' . md5($key);
+
         return substr(
             $this->getKey($key),
             0,
