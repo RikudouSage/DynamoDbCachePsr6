@@ -9,9 +9,11 @@ jobs:
   code_style:
     name: Test code style
     runs-on: ubuntu-latest
+    env:
+      PHP_CS_FIXER_IGNORE_ENV: yes
     strategy:
       matrix:
-        version: ['7.3', '7.4', '8.0']
+        version: ['7.3', '7.4', '8.0', '8.1']
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -28,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['7.3', '7.4', '8.0']
+        version: ['7.3', '7.4', '8.0', '8.1']
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -45,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['7.3', '7.4', '8.0']
+        version: ['7.3', '7.4', '8.0', '8.1']
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

@@ -3,14 +3,25 @@
 namespace Rikudou\Tests\DynamoDbCache;
 
 use ArrayIterator;
-use Aws\DynamoDb\DynamoDbClient;
-use Aws\DynamoDb\Exception\DynamoDbException;
-use Aws\Result;
+use AsyncAws\Core\Response;
+use AsyncAws\Core\Test\Http\SimpleMockedResponse;
+use AsyncAws\Core\Test\ResultMockFactory;
+use AsyncAws\DynamoDb\DynamoDbClient;
+use AsyncAws\DynamoDb\Exception\ResourceNotFoundException;
+use AsyncAws\DynamoDb\Result\BatchGetItemOutput;
+use AsyncAws\DynamoDb\Result\BatchWriteItemOutput;
+use AsyncAws\DynamoDb\Result\DeleteItemOutput;
+use AsyncAws\DynamoDb\Result\GetItemOutput;
+use AsyncAws\DynamoDb\Result\PutItemOutput;
+use AsyncAws\DynamoDb\ValueObject\AttributeValue;
+use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
 use DateTime;
 use DateTimeImmutable;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
+use Psr\Log\NullLogger;
 use ReflectionClass;
 use ReflectionObject;
 use Rikudou\Clock\Clock;
@@ -20,6 +31,9 @@ use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 use stdClass;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpClient\TraceableHttpClient;
 
 final class DynamoDbCacheTest extends TestCase
 {
@@ -90,11 +104,6 @@ final class DynamoDbCacheTest extends TestCase
     /**
      * @var DynamoDbCache
      */
-    private $instanceFailure;
-
-    /**
-     * @var DynamoDbCache
-     */
     private $instancePrefixed;
 
     /**
@@ -111,13 +120,6 @@ final class DynamoDbCacheTest extends TestCase
         }, $this->itemPoolDefault);
 
         $this->instance = new DynamoDbCache('test', $this->getFakeClient($this->itemPoolDefault));
-        $this->instanceFailure = new DynamoDbCache('test', $this->getFakeClient(
-            $this->itemPoolDefault,
-            'id',
-            '',
-            '',
-            'RandomErrorCode'
-        ));
 
         $idField = 'customId';
         $ttlField = 'customTtl';
@@ -182,10 +184,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($item->isHit());
         self::assertNull($item->getExpiresAt());
         self::assertEquals('N;', $item->getRaw());
-
-        // dynamo db failure
-        $this->expectException(DynamoDbException::class);
-        $this->instanceFailure->getItem('test');
     }
 
     public function testGetItemPrefixed()
@@ -290,6 +288,44 @@ final class DynamoDbCacheTest extends TestCase
         }
     }
 
+    /**
+     * @see https://github.com/RikudouSage/DynamoDbCachePsr6/issues/19
+     */
+    public function testGetItemKeyTooLong()
+    {
+        $key = bin2hex(random_bytes(1025));
+
+        $item = $this->instance->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+        self::assertLessThanOrEqual(2048, strlen($item->getKey()));
+
+        $item = $this->instancePrefixed->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+        self::assertNotEquals($this->prefix . $key, $item->getKey());
+        self::assertStringStartsWith($this->prefix, $item->getKey());
+        self::assertLessThanOrEqual(2048, strlen($item->getKey()));
+
+        $key = bin2hex(random_bytes(1023));
+
+        $item = $this->instance->getItem($key);
+        self::assertEquals($key, $item->getKey());
+        $item = $this->instancePrefixed->getItem($key);
+        self::assertNotEquals($key, $item->getKey());
+
+        $this->expectException(LogicException::class);
+        new DynamoDbCache(
+            'test',
+            $this->getFakeClient($this->itemPoolPrefixed),
+            'id',
+            'ttl',
+            'value',
+            null,
+            null,
+            null,
+            bin2hex(random_bytes(1024)),
+        );
+    }
+
     public function testGetItemsPrefixed()
     {
         $result = $this->instancePrefixed->getItems([
@@ -371,10 +407,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($this->instance->hasItem('test456'));
         self::assertTrue($this->instance->hasItem('test789'));
         self::assertFalse($this->instance->hasItem('test852'));
-
-        // dynamo db failure
-        $this->expectException(DynamoDbException::class);
-        $this->instanceFailure->getItem('test');
     }
 
     public function testHasItemPrefixed()
@@ -383,10 +415,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($this->instancePrefixed->hasItem('test456'));
         self::assertTrue($this->instancePrefixed->hasItem('test789'));
         self::assertFalse($this->instancePrefixed->hasItem('test852'));
-
-        // dynamo db failure
-        $this->expectException(DynamoDbException::class);
-        $this->instanceFailure->getItem('test');
     }
 
     public function testHasItemNonDefaultFields()
@@ -400,7 +428,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($this->instance->clear());
         self::assertFalse($this->instanceCustom->clear());
         self::assertFalse($this->instancePrefixed->clear());
-        self::assertFalse($this->instanceFailure->clear());
     }
 
     public function testDeleteItemDefaultKeys()
@@ -469,12 +496,6 @@ final class DynamoDbCacheTest extends TestCase
             'test852',
         ]);
         self::assertTrue($result);
-
-        $result = $this->instance->deleteItems([ // simulate throughput exceeded
-            'test852',
-            'test258',
-        ]);
-        self::assertFalse($result);
     }
 
     public function testDeleteItemsPrefixed()
@@ -486,12 +507,6 @@ final class DynamoDbCacheTest extends TestCase
             'test852',
         ]);
         self::assertTrue($result);
-
-        $result = $this->instancePrefixed->deleteItems([ // simulate throughput exceeded
-            'test852',
-            'test258',
-        ]);
-        self::assertFalse($result);
     }
 
     public function testDeleteItemsNonDefaultKeys()
@@ -503,12 +518,6 @@ final class DynamoDbCacheTest extends TestCase
             'test852',
         ]);
         self::assertTrue($result);
-
-        $result = $this->instanceCustom->deleteItems([ // simulate throughput exceeded
-            'test852',
-            'test258',
-        ]);
-        self::assertFalse($result);
     }
 
     public function testSaveDefaultKeys()
@@ -528,9 +537,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertFalse($cacheItem->isHit());
         self::assertEquals('test654', $cacheItem->get());
         self::assertEquals('2030-01-01 15:30:45', $cacheItem->getExpiresAt()->format('Y-m-d H:i:s'));
-
-        $result = $this->instanceFailure->save($cacheItem);
-        self::assertFalse($result);
 
         $result = $this->instance->save($this->getEmptyBaseCacheItem());
         self::assertTrue($result);
@@ -611,20 +617,6 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($result);
         self::assertCount(0, $deferred->getValue($this->instance));
         self::assertCount(1, $this->itemPoolSaved);
-
-        // failure
-        $this->itemPoolSaved = [];
-        $deferred = (new ReflectionObject($this->instanceFailure))->getProperty('deferred');
-        $deferred->setAccessible(true);
-        $item = $this->instance->getItem('test852');
-        $item->set('test');
-        $this->instanceFailure->saveDeferred($item);
-        self::assertCount(1, $deferred->getValue($this->instanceFailure));
-        self::assertCount(0, $this->itemPoolSaved);
-        $result = $this->instanceFailure->commit();
-        self::assertFalse($result);
-        self::assertCount(1, $deferred->getValue($this->instanceFailure));
-        self::assertCount(0, $this->itemPoolSaved);
     }
 
     public function testGet()
@@ -926,12 +918,6 @@ final class DynamoDbCacheTest extends TestCase
             'test456',
             'test789',
         ]));
-
-        // simulate error
-        self::assertFalse($this->instance->deleteMultiple([
-            'test258',
-            'test852',
-        ]));
     }
 
     public function testDeleteMultiplePrefixed()
@@ -940,12 +926,6 @@ final class DynamoDbCacheTest extends TestCase
             'test123',
             'test456',
             'test789',
-        ]));
-
-        // simulate error
-        self::assertFalse($this->instancePrefixed->deleteMultiple([
-            'test258',
-            'test852',
         ]));
     }
 
@@ -1124,37 +1104,39 @@ final class DynamoDbCacheTest extends TestCase
                 $this->parent = $parent;
             }
 
-            public function getItem(array $args = [], bool $raw = false)
+            public function getItem($input): GetItemOutput
             {
+                assert(is_array($input));
                 $availableIds = array_column(array_column($this->pool, $this->idField), 'S');
-                $id = $args['Key'][$this->idField]['S'];
+                $id = $input['Key'][$this->idField]['S'];
                 if (!in_array($id, $availableIds, true)) {
-                    throw $this->getException();
+                    $data = [[]];
+                } else {
+                    $data = array_filter($this->pool, function ($item) use ($id) {
+                        return $item[$this->idField]['S'] === $id;
+                    });
                 }
 
-                $data = array_filter($this->pool, function ($item) use ($id) {
-                    return $item[$this->idField]['S'] === $id;
-                });
-
-                if ($raw) {
-                    return reset($data);
+                foreach ($data as $key => $value) {
+                    $data[$key] = new MockResponse(json_encode(['Item' => $value]));
                 }
 
-                return new Result([
-                    'Item' => reset($data),
-                ]);
+                $client = new MockHttpClient(reset($data));
+                return new GetItemOutput(
+                    new Response(
+                        $client->request('GET', 'https://example.com'),
+                        $client,
+                        new NullLogger()
+                    )
+                );
             }
 
-            public function batchGetItem(array $args = [])
+            public function batchGetItem($input): BatchGetItemOutput
             {
-                $table = array_key_first($args['RequestItems']);
-                $keys = array_column(
-                    array_column(
-                        $args['RequestItems'][$table]['Keys'],
-                        $this->idField
-                    ),
-                    'S'
-                );
+                $table = array_key_first($input['RequestItems']);
+                $keys = array_map(function (array $data) {
+                    return $data[$this->idField]->getS();
+                }, $input['RequestItems'][$table]->getKeys());
 
                 $result = [
                     'Responses' => [
@@ -1163,29 +1145,35 @@ final class DynamoDbCacheTest extends TestCase
                 ];
                 $i = 0;
                 foreach ($keys as $key) {
-                    try {
-                        $data = $this->getItem([
-                            'Key' => [
-                                $this->idField => [
-                                    'S' => $key,
-                                ],
+                    $data = $this->getItem([
+                        'Key' => [
+                            $this->idField => [
+                                'S' => $key,
                             ],
-                        ], true);
-                        $result['Responses'][$table][] = $data;
-                    } catch (DynamoDbException $e) {
-                        if ($i % 2 === 0) {
-                            $result['UnprocessedKeys'][$table][]['Keys'][]['S'] = $key;
-                        }
+                        ],
+                    ])->getItem();
+                    if (!count($data)) {
+                        continue;
                     }
+                    $result['Responses'][$table][] = array_map(function (AttributeValue $value) {
+                        return $value->getS() ? ['S' => $value->getS()] : ['N' => $value->getN()];
+                    }, $data);
                     ++$i;
                 }
 
-                return new Result($result);
+                $client = new MockHttpClient(new MockResponse(json_encode($result)));
+                return new BatchGetItemOutput(
+                    new Response(
+                        $client->request('GET', 'https://example.com'),
+                        $client,
+                        new NullLogger()
+                    )
+                );
             }
 
-            public function deleteItem(array $args = [])
+            public function deleteItem($input): DeleteItemOutput
             {
-                $key = $args['Key'][$this->idField]['S'];
+                $key = $input['Key'][$this->idField]['S'];
                 $this->getItem([
                     'Key' => [
                         $this->idField => [
@@ -1193,16 +1181,25 @@ final class DynamoDbCacheTest extends TestCase
                         ],
                     ],
                 ]);
+
+                $client = new MockHttpClient(new MockResponse('{}'));
+                return new DeleteItemOutput(
+                    new Response(
+                        $client->request('GET', 'https://example.com'),
+                        $client,
+                        new NullLogger()
+                    )
+                );
             }
 
-            public function batchWriteItem(array $args = [])
+            public function batchWriteItem($input): BatchWriteItemOutput
             {
-                $table = array_key_first($args['RequestItems']);
+                $table = array_key_first($input['RequestItems']);
                 $keys = array_column(
                     array_column(
                         array_column(
                             array_column(
-                                $args['RequestItems'][$table],
+                                $input['RequestItems'][$table],
                                 'DeleteRequest'
                             ),
                             'Key'
@@ -1211,65 +1208,46 @@ final class DynamoDbCacheTest extends TestCase
                     ),
                     'S'
                 );
-                $count = count($keys);
-                $unprocessed = 0;
 
                 foreach ($keys as $key) {
-                    try {
-                        $this->deleteItem([
-                            'Key' => [
-                                $this->idField => [
-                                    'S' => $key,
-                                ],
+                    $this->deleteItem([
+                        'Key' => [
+                            $this->idField => [
+                                'S' => $key,
                             ],
-                        ]);
-                    } catch (DynamoDbException $e) {
-                        ++$unprocessed;
-                    }
+                        ],
+                    ]);
                 }
 
-                if ($unprocessed === $count) {
-                    throw $this->getException('ProvisionedThroughputExceededException');
-                }
+                $client = new MockHttpClient(new MockResponse('{}'));
+                return new BatchWriteItemOutput(
+                    new Response(
+                        $client->request('GET', 'https://example.com'),
+                        $client,
+                        new NullLogger()
+                    )
+                );
             }
 
-            public function putItem(array $args = [])
+            public function putItem($input): PutItemOutput
             {
-                if ($this->awsErrorCode !== 'ResourceNotFoundException') {
-                    throw $this->getException();
-                }
                 $reflection = new ReflectionObject($this->parent);
                 $pool = $reflection->getProperty('itemPoolSaved');
                 $pool->setAccessible(true);
 
                 $currentPool = $pool->getValue($this->parent);
-                $currentPool[] = $args['Item'];
+                $currentPool[] = $input['Item'];
 
                 $pool->setValue($this->parent, $currentPool);
-            }
 
-            private function getException(string $errorCode = null): DynamoDbException
-            {
-                if ($errorCode === null) {
-                    $errorCode = $this->awsErrorCode;
-                }
-
-                return new class($errorCode) extends DynamoDbException {
-                    /**
-                     * @var string
-                     */
-                    private $awsErrorCode;
-
-                    public function __construct(string $errorCode)
-                    {
-                        $this->awsErrorCode = $errorCode;
-                    }
-
-                    public function getAwsErrorCode()
-                    {
-                        return $this->awsErrorCode;
-                    }
-                };
+                $client = new MockHttpClient(new MockResponse('{}'));
+                return new PutItemOutput(
+                    new Response(
+                        $client->request('GET', 'https://example.com'),
+                        $client,
+                        new NullLogger()
+                    )
+                );
             }
         };
     }
