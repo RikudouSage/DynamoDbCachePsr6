@@ -2,6 +2,8 @@
 
 namespace Rikudou\DynamoDbCache\Dynamo;
 
+use JetBrains\PhpStorm\ExpectedValues;
+
 interface DynamoDbTableCreatorInterface
 {
     public const MODE_PROVISIONED = 'PROVISIONED';
@@ -9,7 +11,15 @@ interface DynamoDbTableCreatorInterface
 
     public function exists(): bool;
 
-    public function create(string $mode = self::MODE_PAY_PER_REQUEST, bool $throw = true): bool;
+    public function create(
+        #[ExpectedValues(valuesFromClass: self::class)]
+        string $mode = self::MODE_PAY_PER_REQUEST,
+        bool $throw = true
+    ): bool;
 
-    public function createIfNotExists(string $mode = self::MODE_PAY_PER_REQUEST, bool $throw = true): bool;
+    public function createIfNotExists(
+        #[ExpectedValues(valuesFromClass: self::class)]
+        string $mode = self::MODE_PAY_PER_REQUEST,
+        bool $throw = true
+    ): bool;
 }

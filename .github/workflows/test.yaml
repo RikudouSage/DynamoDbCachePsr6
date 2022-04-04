@@ -45,6 +45,8 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
+    env:
+      RIKUDOU_TEST_DYNAMO_TABLE: TestTableDynamoPsr6
     strategy:
       matrix:
         version: ['7.3', '7.4', '8.0', '8.1']
@@ -62,6 +64,8 @@ jobs:
   coverage:
     name: Report Coverage
     runs-on: ubuntu-latest
+    env:
+      RIKUDOU_TEST_DYNAMO_TABLE: TestTableDynamoPsr6
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
