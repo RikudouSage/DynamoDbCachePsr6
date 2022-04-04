@@ -54,7 +54,7 @@ class DynamoDbTableCreatorTest extends TestCase
         $count = 0;
         while ($this->instance->exists()) {
             usleep(2000);
-            if ($count === 100) {
+            if ($count === 1000) {
                 throw new RuntimeException("Table wasn't cleaned up in {$count} iterations");
             }
             ++$count;
