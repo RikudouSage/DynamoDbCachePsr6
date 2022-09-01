@@ -4,8 +4,8 @@
   "minimum-stability": "stable",
   "license": "MIT",
   "require": {
-    "psr/cache": "^1.0 | ^2.0",
-    "php": "^7.3 | ^8.0",
+    "psr/cache": "^1.0 | ^2.0 | ^3.0",
+    "php": "^8.0",
     "rikudou/clock": "^1.0",
     "psr/simple-cache": "^1.0",
     "async-aws/dynamo-db": "^1.0"

@@ -1255,30 +1255,34 @@ final class DynamoDbCacheTest extends TestCase
     private function getEmptyBaseCacheItem()
     {
         return new class implements CacheItemInterface {
-            public function getKey()
+            public function getKey(): string
             {
                 return 'test';
             }
 
-            public function get()
+            public function get(): mixed
             {
+                return 'test';
             }
 
-            public function isHit()
+            public function isHit(): bool
             {
                 return true;
             }
 
-            public function set($value)
+            public function set($value): static
             {
+                return $this;
             }
 
-            public function expiresAt($expiration)
+            public function expiresAt($expiration): static
             {
+                return $this;
             }
 
-            public function expiresAfter($time)
+            public function expiresAfter($time): static
             {
+                return $this;
             }
         };
     }
