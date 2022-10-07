@@ -4,6 +4,7 @@ namespace Rikudou\DynamoDbCache;
 
 use AsyncAws\Core\Exception\Http\ClientException;
 use AsyncAws\Core\Exception\Http\HttpException;
+use AsyncAws\Core\Exception\Http\NetworkException;
 use AsyncAws\DynamoDb\DynamoDbClient;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
@@ -281,7 +282,12 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             throw $exception;
         }
 
-        $item = $this->getRawItem($key);
+        try {
+            $item = $this->getRawItem($key);
+        } catch (CacheItemNotFoundException $e) {
+            return false;
+        }
+
         if (!isset($item[$this->valueField])) {
             return false;
         }
@@ -576,16 +582,22 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private function getRawItem(string $key): array
     {
-        $item = $this->client->getItem([
+        $input = [
             'Key' => [
                 $this->primaryField => [
                     'S' => $key,
                 ],
             ],
             'TableName' => $this->tableName,
-        ]);
+        ];
 
-        return $item->getItem();
+        try {
+            $item = $this->client->getItem($input);
+
+            return $item->getItem();
+        } catch (NetworkException $e) {
+            throw new CacheItemNotFoundException('', 0, $e);
+        }
     }
 
     private function generateCompliantKey(string $key): string
