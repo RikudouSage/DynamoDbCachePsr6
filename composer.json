@@ -36,5 +36,10 @@
     "phpstan": "phpstan analyse --level max src",
     "phpunit": "phpunit",
     "test": "composer fixer -- --dry-run && composer phpstan && composer phpunit"
+  },
+  "config": {
+    "allow-plugins": {
+      "ocramius/package-versions": true
+    }
   }
 }
