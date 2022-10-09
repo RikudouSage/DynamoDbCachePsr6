@@ -3,9 +3,11 @@
 namespace Rikudou\DynamoDbCache;
 
 use AsyncAws\DynamoDb\DynamoDbClient;
+use JetBrains\PhpStorm\ExpectedValues;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
+use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 
 final class DynamoDbCacheBuilder
 {
@@ -53,6 +55,11 @@ final class DynamoDbCacheBuilder
      * @var CacheItemEncoderInterface|null
      */
     private $encoder = null;
+
+    /**
+     * @var int
+     */
+    private $networkErrorMode = NetworkErrorMode::DEFAULT;
 
     private function __construct(string $tableName, DynamoDbClient $client)
     {
@@ -121,6 +128,16 @@ final class DynamoDbCacheBuilder
         return $copy;
     }
 
+    public function withNetworkErrorMode(
+        #[ExpectedValues(valuesFromClass: NetworkErrorMode::class)]
+        int $networkErrorMode
+    ): self {
+        $copy = clone $this;
+        $copy->networkErrorMode = $networkErrorMode;
+
+        return $copy;
+    }
+
     public function build(): DynamoDbCache
     {
         return new DynamoDbCache(
@@ -132,7 +149,8 @@ final class DynamoDbCacheBuilder
             $this->clock,
             $this->converterRegistry,
             $this->encoder,
-            $this->prefix
+            $this->prefix,
+            $this->networkErrorMode
         );
     }
 }

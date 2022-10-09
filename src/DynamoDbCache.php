@@ -9,6 +9,7 @@ use AsyncAws\DynamoDb\DynamoDbClient;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
+use JetBrains\PhpStorm\ExpectedValues;
 use LogicException;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -19,6 +20,7 @@ use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
+use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 use Rikudou\DynamoDbCache\Exception\CacheItemNotFoundException;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
@@ -77,6 +79,12 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private $prefix;
 
+    /**
+     * @var int
+     */
+    #[ExpectedValues(valuesFromClass: NetworkErrorMode::class)]
+    private $networkErrorMode;
+
     public function __construct(
         string $tableName,
         DynamoDbClient $client,
@@ -86,7 +94,9 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         ?ClockInterface $clock = null,
         ?CacheItemConverterRegistry $converter = null,
         ?CacheItemEncoderInterface $encoder = null,
-        ?string $prefix = null
+        ?string $prefix = null,
+        #[ExpectedValues(valuesFromClass: NetworkErrorMode::class)]
+        int $networkErrorMode = NetworkErrorMode::DEFAULT
     ) {
         $this->tableName = $tableName;
         $this->client = $client;
@@ -116,6 +126,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         }
         $this->prefix = $prefix;
+        $this->networkErrorMode = $networkErrorMode;
     }
 
     /**
@@ -582,21 +593,29 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private function getRawItem(string $key): array
     {
-        $input = [
-            'Key' => [
-                $this->primaryField => [
-                    'S' => $key,
-                ],
-            ],
-            'TableName' => $this->tableName,
-        ];
-
         try {
-            $item = $this->client->getItem($input);
+            $item = $this->client->getItem([
+                'Key' => [
+                    $this->primaryField => [
+                        'S' => $key,
+                    ],
+                ],
+                'TableName' => $this->tableName,
+            ]);
 
             return $item->getItem();
         } catch (NetworkException $e) {
-            throw new CacheItemNotFoundException('', 0, $e);
+            switch ($this->networkErrorMode) {
+                case NetworkErrorMode::IGNORE:
+                    throw new CacheItemNotFoundException('', 0, $e);
+                case NetworkErrorMode::THROW:
+                    throw $e;
+                case NetworkErrorMode::WARNING:
+                    trigger_error("Network error when connecting to DynamoDB: {$e->getMessage()}", E_USER_WARNING);
+                    break; // @codeCoverageIgnore
+            }
+
+            throw new LogicException("Unsupported network error mode: {$this->networkErrorMode}");
         }
     }
 
