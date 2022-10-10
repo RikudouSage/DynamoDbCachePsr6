@@ -12,6 +12,7 @@ use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
 use PHPUnit\Framework\TestCase;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
+use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 
 class DynamoDbCacheBuilderTest extends TestCase
 {
@@ -43,6 +44,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testImmutability()
@@ -58,6 +60,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertNotSame($this->instance, $this->instance->withPrimaryField('test'));
         self::assertNotSame($this->instance, $this->instance->withTtlField('test'));
         self::assertNotSame($this->instance, $this->instance->withValueField('test'));
+        self::assertNotSame($this->instance, $this->instance->withNetworkErrorMode(NetworkErrorMode::WARNING));
 
         $result = $this->getBuiltData($this->instance->build());
         self::assertNotSame($clock, $result['clock']);
@@ -82,6 +85,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithTtlField()
@@ -96,6 +100,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithPrimaryField()
@@ -111,6 +116,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithPrefix()
@@ -126,6 +132,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertEquals('test', $result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithEncoder()
@@ -142,6 +149,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertSame($encoder, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithConverterRegistry()
@@ -158,6 +166,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertSame($registry, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testWithClock()
@@ -174,6 +183,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
+        self::assertEquals(NetworkErrorMode::DEFAULT, $result['networkErrorMode']);
     }
 
     public function testAllAtOnce()
@@ -189,7 +199,9 @@ class DynamoDbCacheBuilderTest extends TestCase
             ->withPrefix('testPrefix')
             ->withPrimaryField('id1')
             ->withTtlField('ttl1')
-            ->withValueField('value1');
+            ->withValueField('value1')
+            ->withNetworkErrorMode(NetworkErrorMode::IGNORE)
+        ;
 
         $result = $this->getBuiltData($instance->build());
         self::assertEquals('test', $result['tableName']);
@@ -200,6 +212,23 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertSame($registry, $result['converter']);
         self::assertSame($encoder, $result['encoder']);
         self::assertEquals('testPrefix', $result['prefix']);
+        self::assertEquals(NetworkErrorMode::IGNORE, $result['networkErrorMode']);
+    }
+
+    public function testWithNetworkErrorMode()
+    {
+        $instance = $this->instance->withNetworkErrorMode(NetworkErrorMode::IGNORE);
+
+        $result = $this->getBuiltData($instance->build());
+        self::assertEquals('test', $result['tableName']);
+        self::assertEquals('id', $result['primaryField']);
+        self::assertEquals('ttl', $result['ttlField']);
+        self::assertEquals('value', $result['valueField']);
+        self::assertInstanceOf(ClockInterface::class, $result['clock']);
+        self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
+        self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
+        self::assertEquals(null, $result['prefix']);
+        self::assertEquals(NetworkErrorMode::IGNORE, $result['networkErrorMode']);
     }
 
     private function getBuiltData(DynamoDbCache $cache): array
