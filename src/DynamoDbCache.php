@@ -126,6 +126,10 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
             );
         }
         $this->prefix = $prefix;
+
+        if (!in_array($networkErrorMode, NetworkErrorMode::cases())) {
+            throw new LogicException("Unsupported network error mode: {$networkErrorMode}");
+        }
         $this->networkErrorMode = $networkErrorMode;
     }
 
@@ -593,15 +597,17 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private function getRawItem(string $key): array
     {
-        try {
-            $item = $this->client->getItem([
-                'Key' => [
-                    $this->primaryField => [
-                        'S' => $key,
-                    ],
+        $input = [
+            'Key' => [
+                $this->primaryField => [
+                    'S' => $key,
                 ],
-                'TableName' => $this->tableName,
-            ]);
+            ],
+            'TableName' => $this->tableName,
+        ];
+
+        try {
+            $item = $this->client->getItem($input);
 
             return $item->getItem();
         } catch (NetworkException $e) {
@@ -615,7 +621,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
                     break; // @codeCoverageIgnore
             }
 
-            throw new LogicException("Unsupported network error mode: {$this->networkErrorMode}");
+            throw new LogicException("This exception shouldn't happen because invalid network mode should be handled in constructor"); // @codeCoverageIgnore
         }
     }
 

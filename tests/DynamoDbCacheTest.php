@@ -1262,11 +1262,8 @@ final class DynamoDbCacheTest extends TestCase
     {
         $client = $this->createMock(DynamoDbClient::class);
 
-        // NetworkException may occur when AsyncAws fails to connect to DynamoDB.
-        // In the case of a connection failure, we should treat it as a cache miss.
-        $client->method('getItem')->willThrowException(new NetworkException());
-
-        $cache = new DynamoDbCache(
+        $this->expectException(LogicException::class);
+        new DynamoDbCache(
             'test',
             $client,
             'id',
@@ -1278,9 +1275,6 @@ final class DynamoDbCacheTest extends TestCase
             null,
             -3
         );
-
-        $this->expectException(LogicException::class);
-        $cache->deleteItem('foo');
     }
 
     private function getFakeClient(
