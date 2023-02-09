@@ -11,7 +11,7 @@ final class CacheItemConverterRegistry
     /**
      * @var CacheItemConverterInterface[]
      */
-    private $converters;
+    private array $converters;
 
     public function __construct(CacheItemConverterInterface ...$converters)
     {

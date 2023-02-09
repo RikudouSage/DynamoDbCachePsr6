@@ -11,35 +11,17 @@ use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoCacheItem implements CacheItemInterface
 {
-    /**
-     * @var string
-     */
-    private $key;
+    private string $key;
 
-    /**
-     * @var bool
-     */
-    private $isHit;
+    private bool $isHit;
 
-    /**
-     * @var DateTimeInterface|null
-     */
-    private $expiresAt;
+    private ?DateTimeInterface $expiresAt;
 
-    /**
-     * @var string
-     */
-    private $value;
+    private string $value;
 
-    /**
-     * @var ClockInterface
-     */
-    private $clock;
+    private ClockInterface $clock;
 
-    /**
-     * @var CacheItemEncoderInterface
-     */
-    private $encoder;
+    private CacheItemEncoderInterface $encoder;
 
     /**
      * @param string                    $key
@@ -68,7 +50,7 @@ final class DynamoCacheItem implements CacheItemInterface
         $this->set($value);
     }
 
-    public function getKey()
+    public function getKey(): string
     {
         return $this->key;
     }
@@ -78,19 +60,19 @@ final class DynamoCacheItem implements CacheItemInterface
         return $this->encoder->decode($this->value);
     }
 
-    public function isHit()
+    public function isHit(): bool
     {
         return $this->isHit && ($this->clock->now() < $this->expiresAt || $this->expiresAt === null);
     }
 
-    public function set($value)
+    public function set($value): self
     {
         $this->value = $this->encoder->encode($value);
 
         return $this;
     }
 
-    public function expiresAt($expiration)
+    public function expiresAt($expiration): self
     {
         if ($expiration === null) {
             $this->expiresAt = null;
@@ -103,7 +85,7 @@ final class DynamoCacheItem implements CacheItemInterface
         return $this;
     }
 
-    public function expiresAfter($time)
+    public function expiresAfter($time): self
     {
         if ($time === null) {
             $this->expiresAt = null;

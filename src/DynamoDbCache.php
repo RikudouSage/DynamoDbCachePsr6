@@ -29,61 +29,31 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     private const RESERVED_CHARACTERS = '{}()/\@:';
     private const MAX_KEY_LENGTH = 2048;
 
-    /**
-     * @var string
-     */
-    private $tableName;
+    private string $tableName;
+
+    private DynamoDbClient $client;
+
+    private string $primaryField;
+
+    private string $ttlField;
+
+    private string $valueField;
 
     /**
-     * @var DynamoDbClient
+     * @var array<DynamoCacheItem>
      */
-    private $client;
+    private array $deferred = [];
 
-    /**
-     * @var string
-     */
-    private $primaryField;
+    private ClockInterface $clock;
 
-    /**
-     * @var string
-     */
-    private $ttlField;
+    private CacheItemConverterRegistry $converter;
 
-    /**
-     * @var string
-     */
-    private $valueField;
+    private CacheItemEncoderInterface $encoder;
 
-    /**
-     * @var DynamoCacheItem[]
-     */
-    private $deferred = [];
+    private ?string $prefix;
 
-    /**
-     * @var ClockInterface
-     */
-    private $clock;
-
-    /**
-     * @var CacheItemConverterRegistry
-     */
-    private $converter;
-
-    /**
-     * @var CacheItemEncoderInterface
-     */
-    private $encoder;
-
-    /**
-     * @var string|null
-     */
-    private $prefix;
-
-    /**
-     * @var int
-     */
     #[ExpectedValues(valuesFromClass: NetworkErrorMode::class)]
-    private $networkErrorMode;
+    private int $networkErrorMode;
 
     public function __construct(
         string $tableName,
@@ -140,7 +110,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return DynamoCacheItem
      */
-    public function getItem($key)
+    public function getItem($key): DynamoCacheItem
     {
         if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
             throw $exception;
@@ -189,7 +159,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return DynamoCacheItem[]
      */
-    public function getItems(array $keys = [])
+    public function getItems(array $keys = []): array
     {
         $keys = array_map(function ($key) {
             if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
@@ -264,7 +234,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function hasItem($key)
+    public function hasItem($key): bool
     {
         return $this->getItem($key)->isHit();
     }
@@ -272,7 +242,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     /**
      * @return false
      */
-    public function clear()
+    public function clear(): bool
     {
         return false;
     }
@@ -285,7 +255,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function deleteItem($key)
+    public function deleteItem($key): bool
     {
         if ($key instanceof DynamoCacheItem) {
             $key = $key->getKey();
@@ -325,7 +295,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function deleteItems(array $keys)
+    public function deleteItems(array $keys): bool
     {
         $keys = array_map(function ($key) {
             if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
@@ -359,7 +329,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function save(CacheItemInterface $item)
+    public function save(CacheItemInterface $item): bool
     {
         $item = $this->converter->convert($item);
         if ($exception = $this->getExceptionForInvalidKey($item->getKey())) {
@@ -400,7 +370,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function saveDeferred(CacheItemInterface $item)
+    public function saveDeferred(CacheItemInterface $item): bool
     {
         if ($exception = $this->getExceptionForInvalidKey($item->getKey())) {
             throw $exception;
@@ -417,7 +387,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function commit()
+    public function commit(): bool
     {
         $result = true;
         foreach ($this->deferred as $key => $item) {
@@ -459,7 +429,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function set($key, $value, $ttl = null)
+    public function set($key, $value, $ttl = null): bool
     {
         $item = $this->getItem($key);
         if ($ttl !== null) {
@@ -477,20 +447,20 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function delete($key)
+    public function delete($key): bool
     {
         return $this->deleteItem($key);
     }
 
     /**
-     * @param iterable<string> $keys
-     * @param mixed            $default
+     * @param iterable<int|string, string> $keys
+     * @param mixed                        $default
      *
      * @throws InvalidArgumentException
      *
      * @return mixed[]
      */
-    public function getMultiple($keys, $default = null)
+    public function getMultiple($keys, $default = null): iterable
     {
         $result = array_combine(
             $this->iterableToArray($keys),
@@ -515,7 +485,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function setMultiple($values, $ttl = null)
+    public function setMultiple($values, $ttl = null): bool
     {
         foreach ($values as $key => $value) {
             $item = $this->getItem($key);
@@ -530,13 +500,13 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     }
 
     /**
-     * @param iterable<string> $keys
+     * @param iterable<int|string, string> $keys
      *
      * @throws InvalidArgumentException
      *
      * @return bool
      */
-    public function deleteMultiple($keys)
+    public function deleteMultiple($keys): bool
     {
         return $this->deleteItems($this->iterableToArray($keys));
     }
@@ -548,7 +518,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      *
      * @return bool
      */
-    public function has($key)
+    public function has($key): bool
     {
         return $this->hasItem($key);
     }
@@ -569,9 +539,12 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
     }
 
     /**
-     * @param iterable<mixed,mixed> $iterable
+     * @template TKey of int|string
+     * @template TValue
      *
-     * @return array<mixed,mixed>
+     * @param iterable<TKey, TValue> $iterable
+     *
+     * @return array<TKey, TValue>
      */
     private function iterableToArray(iterable $iterable): array
     {

@@ -6,20 +6,11 @@ use RuntimeException;
 
 final class JsonItemEncoder implements CacheItemEncoderInterface
 {
-    /**
-     * @var int
-     */
-    private $encodeFlags;
+    private int $encodeFlags;
 
-    /**
-     * @var int
-     */
-    private $depth;
+    private int $depth;
 
-    /**
-     * @var int
-     */
-    private $decodeFlags;
+    private int $decodeFlags;
 
     public function __construct(int $encodeFlags = 0, int $decodeFlags = 0, int $depth = 512)
     {
