@@ -11,60 +11,26 @@ use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 
 final class DynamoDbCacheBuilder
 {
-    /**
-     * @var string
-     */
-    private $tableName;
+    private string $primaryField = 'id';
 
-    /**
-     * @var DynamoDbClient
-     */
-    private $client;
+    private string $ttlField = 'ttl';
 
-    /**
-     * @var string
-     */
-    private $primaryField = 'id';
+    private string $valueField = 'value';
 
-    /**
-     * @var string
-     */
-    private $ttlField = 'ttl';
+    private ?string $prefix = null;
 
-    /**
-     * @var string
-     */
-    private $valueField = 'value';
+    private ?ClockInterface $clock = null;
 
-    /**
-     * @var string|null
-     */
-    private $prefix = null;
+    private ?CacheItemConverterRegistry $converterRegistry = null;
 
-    /**
-     * @var ClockInterface|null
-     */
-    private $clock = null;
+    private ?CacheItemEncoderInterface $encoder = null;
 
-    /**
-     * @var CacheItemConverterRegistry|null
-     */
-    private $converterRegistry = null;
+    private int $networkErrorMode = NetworkErrorMode::DEFAULT;
 
-    /**
-     * @var CacheItemEncoderInterface|null
-     */
-    private $encoder = null;
-
-    /**
-     * @var int
-     */
-    private $networkErrorMode = NetworkErrorMode::DEFAULT;
-
-    private function __construct(string $tableName, DynamoDbClient $client)
-    {
-        $this->tableName = $tableName;
-        $this->client = $client;
+    private function __construct(
+        private string $tableName,
+        private DynamoDbClient $client
+    ) {
     }
 
     public static function create(string $tableName, DynamoDbClient $client): self

@@ -76,10 +76,6 @@ final class DynamoCacheItemTest extends TestCase
 
         $this->instance->expiresAt(null);
         self::assertNull($this->instance->getExpiresAt());
-
-        $this->expectException(InvalidArgumentException::class);
-        /** @noinspection PhpParamsInspection */
-        $this->instance->expiresAt('test');
     }
 
     public function testExpiresAfter()
@@ -92,9 +88,6 @@ final class DynamoCacheItemTest extends TestCase
 
         $this->instance->expiresAfter(new DateInterval('P1DT2H3M'));
         self::assertEquals('2030-01-02T17:04:00+00:00', $this->instance->getExpiresAt()->format('c'));
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->instance->expiresAfter('test');
     }
 
     public function testGetRaw()

@@ -7,64 +7,22 @@ use DateTimeInterface;
 use Psr\Cache\CacheItemInterface;
 use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
-use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 
 final class DynamoCacheItem implements CacheItemInterface
 {
-    /**
-     * @var string
-     */
-    private $key;
+    private string $value;
 
     /**
-     * @var bool
-     */
-    private $isHit;
-
-    /**
-     * @var DateTimeInterface|null
-     */
-    private $expiresAt;
-
-    /**
-     * @var string
-     */
-    private $value;
-
-    /**
-     * @var ClockInterface
-     */
-    private $clock;
-
-    /**
-     * @var CacheItemEncoderInterface
-     */
-    private $encoder;
-
-    /**
-     * @param string                    $key
-     * @param bool                      $isHit
-     * @param mixed                     $value
-     * @param DateTimeInterface|null    $expiresAt
-     * @param ClockInterface            $clock
-     * @param CacheItemEncoderInterface $encoder
-     *
      * @internal
      */
     public function __construct(
-        string $key,
-        bool $isHit,
-        $value,
-        ?DateTimeInterface $expiresAt,
-        ClockInterface $clock,
-        CacheItemEncoderInterface $encoder
+        private string $key,
+        private bool $isHit,
+        mixed $value,
+        private ?DateTimeInterface $expiresAt,
+        private ClockInterface $clock,
+        private CacheItemEncoderInterface $encoder
     ) {
-        $this->key = $key;
-        $this->isHit = $isHit;
-        $this->expiresAt = $expiresAt;
-        $this->clock = $clock;
-        $this->encoder = $encoder;
-
         $this->set($value);
     }
 
@@ -83,33 +41,25 @@ final class DynamoCacheItem implements CacheItemInterface
         return $this->isHit && ($this->clock->now() < $this->expiresAt || $this->expiresAt === null);
     }
 
-    public function set($value): static
+    public function set(mixed $value): static
     {
         $this->value = $this->encoder->encode($value);
 
         return $this;
     }
 
-    /**
-     * @param ?\DateTimeInterface $expiration
-     */
-    public function expiresAt($expiration): static
+    public function expiresAt(?DateTimeInterface $expiration): static
     {
         if ($expiration === null) {
             $this->expiresAt = null;
-        } elseif ($expiration instanceof DateTimeInterface) {
-            $this->expiresAt = $expiration;
         } else {
-            throw new InvalidArgumentException('The expiration must be null or instance of ' . DateTimeInterface::class);
+            $this->expiresAt = $expiration;
         }
 
         return $this;
     }
 
-    /**
-     * @param int|\DateInterval|null $time
-     */
-    public function expiresAfter($time): static
+    public function expiresAfter(DateInterval|int|null $time): static
     {
         if ($time === null) {
             $this->expiresAt = null;
@@ -117,9 +67,6 @@ final class DynamoCacheItem implements CacheItemInterface
             $now = $this->clock->now();
             if (is_int($time)) {
                 $time = new DateInterval("PT{$time}S");
-            }
-            if (!$time instanceof DateInterval) {
-                throw new InvalidArgumentException('The argument must be an int, DateInterval or null');
             }
 
             assert(method_exists($now, 'add'));
@@ -130,10 +77,7 @@ final class DynamoCacheItem implements CacheItemInterface
     }
 
     /**
-     * @return string
-     *
      * @internal
-     *
      */
     public function getRaw(): string
     {
@@ -141,10 +85,7 @@ final class DynamoCacheItem implements CacheItemInterface
     }
 
     /**
-     * @return DateTimeInterface|null
-     *
      * @internal
-     *
      */
     public function getExpiresAt(): ?DateTimeInterface
     {

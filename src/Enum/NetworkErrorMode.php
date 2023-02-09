@@ -19,6 +19,9 @@ final class NetworkErrorMode
     {
         $reflection = new ReflectionClass(self::class);
 
-        return array_values($reflection->getConstants());
+        /** @var array<int> $result */
+        $result = array_values($reflection->getConstants());
+
+        return $result;
     }
 }

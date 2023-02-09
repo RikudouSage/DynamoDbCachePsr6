@@ -1,2 +1,4 @@
 parameters:
   treatPhpDocTypesAsCertain: false
+  ignoreErrors:
+   - '#expects int<.+?>, int given#'
