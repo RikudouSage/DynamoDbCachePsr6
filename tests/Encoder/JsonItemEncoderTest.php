@@ -87,7 +87,7 @@ final class JsonItemEncoderTest extends TestCase
     private function getJsonSerializableObject()
     {
         return new class implements JsonSerializable {
-            public function jsonSerialize()
+            public function jsonSerialize(): mixed
             {
                 return [
                     'key1' => 'value1',
