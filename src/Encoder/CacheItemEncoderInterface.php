@@ -9,12 +9,12 @@ interface CacheItemEncoderInterface
      *
      * @return string
      */
-    public function encode($input): string;
+    public function encode(mixed $input): string;
 
     /**
      * @param string $input
      *
      * @return mixed
      */
-    public function decode(string $input);
+    public function decode(string $input): mixed;
 }
