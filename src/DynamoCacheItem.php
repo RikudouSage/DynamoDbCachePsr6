@@ -41,14 +41,14 @@ final class DynamoCacheItem implements CacheItemInterface
         return $this->isHit && ($this->clock->now() < $this->expiresAt || $this->expiresAt === null);
     }
 
-    public function set($value): self
+    public function set(mixed $value): static
     {
         $this->value = $this->encoder->encode($value);
 
         return $this;
     }
 
-    public function expiresAt(?DateTimeInterface $expiration): self
+    public function expiresAt(?DateTimeInterface $expiration): static
     {
         if ($expiration === null) {
             $this->expiresAt = null;
@@ -59,7 +59,7 @@ final class DynamoCacheItem implements CacheItemInterface
         return $this;
     }
 
-    public function expiresAfter(DateInterval|int|null $time): self
+    public function expiresAfter(DateInterval|int|null $time): static
     {
         if ($time === null) {
             $this->expiresAt = null;
