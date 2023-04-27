@@ -38,7 +38,7 @@ class Base64ItemEncoderTest extends TestCase
         }
     }
 
-    private function encodeItems(): iterable
+    public function encodeItems(): iterable
     {
         yield [1];
         yield ['test'];
