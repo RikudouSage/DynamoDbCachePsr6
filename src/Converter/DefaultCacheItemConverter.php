@@ -15,7 +15,7 @@ final class DefaultCacheItemConverter implements CacheItemConverterInterface
 
     private ClockInterface $clock;
 
-    public function __construct(?CacheItemEncoderInterface $encoder = null, ClockInterface $clock = null)
+    public function __construct(?CacheItemEncoderInterface $encoder = null, ?ClockInterface $clock = null)
     {
         if ($encoder === null) {
             $encoder = new SerializeItemEncoder();
