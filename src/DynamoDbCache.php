@@ -135,6 +135,10 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     public function getItems(array $keys = []): iterable
     {
+        if (!count($keys)) {
+            return [];
+        }
+
         $keys = array_map(function ($key) {
             if ($exception = $this->getExceptionForInvalidKey($this->getKey($key))) {
                 throw $exception;
