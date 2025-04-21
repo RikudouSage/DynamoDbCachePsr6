@@ -209,9 +209,6 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $this->getItem($key)->isHit();
     }
 
-    /**
-     * @return false
-     */
     public function clear(): bool
     {
         $scanQuery = [
@@ -245,6 +242,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
                     ),
                 ],
             ]);
+
             return $response->getUnprocessedItems();
         };
 
