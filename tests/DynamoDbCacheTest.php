@@ -3,6 +3,7 @@
 namespace Rikudou\Tests\DynamoDbCache;
 
 use ArrayIterator;
+use AsyncAws\Core\Exception\Http\ClientException;
 use AsyncAws\Core\Exception\Http\NetworkException;
 use AsyncAws\Core\Response;
 use AsyncAws\DynamoDb\DynamoDbClient;
@@ -231,6 +232,11 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($item->isHit());
         self::assertEquals(1893452400, $item->getExpiresAt()->getTimestamp());
         self::assertEquals('s:4:"test";', $item->getRaw());
+    }
+
+    public function testGetItemsEmpty()
+    {
+        self::assertCount(0, $this->instance->getItems());
     }
 
     public function testGetItemsDefaultFields()
@@ -1344,6 +1350,12 @@ final class DynamoDbCacheTest extends TestCase
                 $keys = array_map(function (array $data) {
                     return $data[$this->idField]->getS();
                 }, $input['RequestItems'][$table]->getKeys());
+
+                if (!count($keys)) {
+                    throw new ClientException(new MockResponse(json_encode([]), [
+                        'http_code' => 400,
+                    ]));
+                }
 
                 $result = [
                     'Responses' => [
