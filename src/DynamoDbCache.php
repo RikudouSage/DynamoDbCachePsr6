@@ -8,6 +8,7 @@ use AsyncAws\Core\Exception\Http\NetworkException;
 use AsyncAws\DynamoDb\DynamoDbClient;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
+use AsyncAws\DynamoDb\ValueObject\WriteRequest;
 use DateInterval;
 use JetBrains\PhpStorm\ExpectedValues;
 use LogicException;
@@ -208,12 +209,61 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         return $this->getItem($key)->isHit();
     }
 
-    /**
-     * @return false
-     */
     public function clear(): bool
     {
-        return false;
+        $scanQuery = [
+            'TableName' => $this->tableName,
+        ];
+        if ($this->prefix !== null) {
+            $scanQuery['FilterExpression'] = 'begins_with(#id, :prefix)';
+            $scanQuery['ExpressionAttributeNames'] = [
+                '#id' => $this->primaryField,
+            ];
+            $scanQuery['ExpressionAttributeValues'] = [
+                ':prefix' => [
+                    'S' => $this->prefix,
+                ],
+            ];
+        }
+        $items = $this->client->scan($scanQuery);
+
+        $handler = function (array $requestItems): array {
+            $response = $this->client->batchWriteItem([
+                'RequestItems' => [
+                    $this->tableName => array_map(
+                        fn (string $key) => [
+                            'DeleteRequest' => [
+                                'Key' => [
+                                    $this->primaryField => ['S' => $key],
+                                ],
+                            ],
+                        ],
+                        $requestItems
+                    ),
+                ],
+            ]);
+
+            return $response->getUnprocessedItems();
+        };
+
+        /** @var array<string, WriteRequest[]> $unprocessed */
+        $unprocessed = [];
+        /** @var array<string> $requestItems */
+        $requestItems = [];
+        foreach ($items as $item) {
+            if (count($requestItems) >= 25) {
+                $unprocessed = array_merge($unprocessed, $handler($requestItems));
+                $requestItems = [];
+            }
+
+            $requestItems[] = $item[$this->primaryField]->getS();
+        }
+
+        if (count($requestItems) > 0) {
+            $unprocessed = array_merge($unprocessed, $handler($requestItems));
+        }
+
+        return count($unprocessed) === 0;
     }
 
     /**

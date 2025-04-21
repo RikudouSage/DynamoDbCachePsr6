@@ -5,15 +5,13 @@ namespace Rikudou\Tests\DynamoDbCache;
 use ArrayIterator;
 use AsyncAws\Core\Exception\Http\NetworkException;
 use AsyncAws\Core\Response;
-use AsyncAws\Core\Test\Http\SimpleMockedResponse;
-use AsyncAws\Core\Test\ResultMockFactory;
 use AsyncAws\DynamoDb\DynamoDbClient;
-use AsyncAws\DynamoDb\Exception\ResourceNotFoundException;
 use AsyncAws\DynamoDb\Result\BatchGetItemOutput;
 use AsyncAws\DynamoDb\Result\BatchWriteItemOutput;
 use AsyncAws\DynamoDb\Result\DeleteItemOutput;
 use AsyncAws\DynamoDb\Result\GetItemOutput;
 use AsyncAws\DynamoDb\Result\PutItemOutput;
+use AsyncAws\DynamoDb\Result\ScanOutput;
 use AsyncAws\DynamoDb\ValueObject\AttributeValue;
 use AsyncAws\DynamoDb\ValueObject\KeysAndAttributes;
 use DateInterval;
@@ -35,7 +33,7 @@ use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
 use stdClass;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\HttpClient\TraceableHttpClient;
+use Traversable;
 
 final class DynamoDbCacheTest extends TestCase
 {
@@ -427,9 +425,9 @@ final class DynamoDbCacheTest extends TestCase
 
     public function testClear()
     {
-        self::assertFalse($this->instance->clear());
-        self::assertFalse($this->instanceCustom->clear());
-        self::assertFalse($this->instancePrefixed->clear());
+        self::assertTrue($this->instance->clear());
+        self::assertTrue($this->instanceCustom->clear());
+        self::assertTrue($this->instancePrefixed->clear());
     }
 
     public function testDeleteItemDefaultKeys()
@@ -1399,6 +1397,34 @@ final class DynamoDbCacheTest extends TestCase
                         new NullLogger()
                     )
                 );
+            }
+
+            public function scan($input): ScanOutput
+            {
+                $availableIds = array_column(array_column($this->pool, $this->idField), 'S');
+                $items = $this->batchGetItem([
+                    'RequestItems' => [
+                        'test' => new KeysAndAttributes([
+                            'Keys' => array_map(
+                                fn (string $id) => [$this->idField => new AttributeValue(['S' => $id])],
+                                $availableIds,
+                            ),
+                        ]),
+                    ],
+                ])->getResponses()['test'];
+
+                return new class($items) extends ScanOutput
+                {
+                    public function __construct(
+                        private array $items
+                    ) {
+                    }
+
+                    public function getIterator(): Traversable
+                    {
+                        return new ArrayIterator($this->items);
+                    }
+                };
             }
 
             public function batchWriteItem($input): BatchWriteItemOutput
