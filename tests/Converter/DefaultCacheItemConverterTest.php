@@ -4,7 +4,6 @@ namespace Rikudou\Tests\DynamoDbCache\Converter;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
-use Rikudou\Clock\Clock;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;

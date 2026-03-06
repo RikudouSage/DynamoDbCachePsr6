@@ -24,7 +24,6 @@ use Psr\Cache\CacheItemInterface;
 use Psr\Log\NullLogger;
 use ReflectionClass;
 use ReflectionObject;
-use Rikudou\Clock\Clock;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;

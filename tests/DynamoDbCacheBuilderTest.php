@@ -4,12 +4,12 @@ namespace Rikudou\Tests\DynamoDbCache;
 
 use AsyncAws\DynamoDb\DynamoDbClient;
 use DateTimeInterface;
+use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use ReflectionObject;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
-use PHPUnit\Framework\TestCase;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;

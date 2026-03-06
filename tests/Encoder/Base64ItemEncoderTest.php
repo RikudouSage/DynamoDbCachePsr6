@@ -2,8 +2,8 @@
 
 namespace Rikudou\Tests\DynamoDbCache\Encoder;
 
-use Rikudou\DynamoDbCache\Encoder\Base64ItemEncoder;
 use PHPUnit\Framework\TestCase;
+use Rikudou\DynamoDbCache\Encoder\Base64ItemEncoder;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
