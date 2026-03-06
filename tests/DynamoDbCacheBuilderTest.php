@@ -6,7 +6,6 @@ use AsyncAws\DynamoDb\DynamoDbClient;
 use DateTimeInterface;
 use Psr\Clock\ClockInterface;
 use ReflectionObject;
-use Rikudou\Clock\Clock;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
@@ -53,7 +52,7 @@ class DynamoDbCacheBuilderTest extends TestCase
     {
         $registry = new CacheItemConverterRegistry();
         $encoder = new JsonItemEncoder();
-        $clock = new Clock();
+        $clock = ClockHelper::psrClock();
 
         self::assertNotSame($this->instance, $this->instance->withClock($clock));
         self::assertNotSame($this->instance, $this->instance->withConverterRegistry($registry));
