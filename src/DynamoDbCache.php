@@ -14,9 +14,9 @@ use JetBrains\PhpStorm\ExpectedValues;
 use LogicException;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Clock\ClockInterface as PsrClock;
 use Psr\SimpleCache\CacheInterface;
-use Rikudou\Clock\Clock;
-use Rikudou\Clock\ClockInterface;
+use Rikudou\Clock\ClockInterface as RikudouClock;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
@@ -24,6 +24,7 @@ use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 use Rikudou\DynamoDbCache\Exception\CacheItemNotFoundException;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
+use Rikudou\DynamoDbCache\Helper\ClockHelper;
 
 final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
 {
@@ -35,7 +36,7 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
      */
     private array $deferred = [];
 
-    private ClockInterface $clock;
+    private PsrClock $clock;
 
     private CacheItemConverterRegistry $converter;
 
@@ -47,16 +48,14 @@ final class DynamoDbCache implements CacheItemPoolInterface, CacheInterface
         private string $primaryField = 'id',
         private string $ttlField = 'ttl',
         private string $valueField = 'value',
-        ?ClockInterface $clock = null,
+        RikudouClock|PsrClock|null $clock = null,
         ?CacheItemConverterRegistry $converter = null,
         ?CacheItemEncoderInterface $encoder = null,
         private ?string $prefix = null,
         #[ExpectedValues(valuesFromClass: NetworkErrorMode::class)]
         private int $networkErrorMode = NetworkErrorMode::DEFAULT,
     ) {
-        if ($clock === null) {
-            $clock = new Clock();
-        }
+        $clock = ClockHelper::psrClock($clock);
         $this->clock = $clock;
 
         if ($encoder === null) {
