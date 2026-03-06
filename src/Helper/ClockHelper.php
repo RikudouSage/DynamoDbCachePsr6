@@ -17,7 +17,7 @@ final class ClockHelper
             trigger_error(sprintf('%s is deprecated, use %s instead', RikudouClock::class, PsrClock::class), E_USER_DEPRECATED);
         }
 
-        return new class ($clock) implements PsrClock {
+        return new class($clock) implements PsrClock {
             public function __construct(
                 private RikudouClock|PsrClock|null $clock = null,
             ) {
