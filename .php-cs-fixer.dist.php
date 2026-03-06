@@ -1,6 +1,8 @@
 <?php
 
-return PhpCsFixer\Config::create()
+use PhpCsFixer\Config;
+
+return (new Config())
     ->setRules([
         '@PSR2' => true,
         'array_syntax' => ['syntax' => 'short'],
@@ -10,7 +12,10 @@ return PhpCsFixer\Config::create()
         ],
         'cast_spaces' => true,
         'class_attributes_separation' => [
-            'elements' => ['method', 'property'],
+            'elements' => [
+                'method' => 'one',
+                'property' => 'one',
+            ],
         ],
         'combine_consecutive_unsets' => true,
         'compact_nullable_typehint' => true,
@@ -70,7 +75,7 @@ return PhpCsFixer\Config::create()
         'single_quote' => true,
         'standardize_not_equals' => true,
         'ternary_operator_spaces' => true,
-        'trailing_comma_in_multiline_array' => true,
+        'trailing_comma_in_multiline' => true,
         'unary_operator_spaces' => true,
         'visibility_required' => [
             'elements' => ['property', 'method', 'const'],
