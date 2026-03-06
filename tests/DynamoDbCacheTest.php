@@ -435,6 +435,70 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($this->instancePrefixed->clear());
     }
 
+    public function testClearBatchesExactly25ItemsIntoSingleRequest()
+    {
+        $ids = array_map(fn (int $i) => "test{$i}", range(1, 25));
+        $client = $this->createMock(DynamoDbClient::class);
+
+        $client->expects(self::once())
+            ->method('scan')
+            ->with(['TableName' => 'test'])
+            ->willReturn($this->createScanOutputForIds($ids));
+
+        $deletedIds = [];
+        $requestSizes = [];
+        $client->expects(self::once())
+            ->method('batchWriteItem')
+            ->willReturnCallback(function (array $input) use (&$deletedIds, &$requestSizes): BatchWriteItemOutput {
+                $requests = $input['RequestItems']['test'];
+                $requestSizes[] = count($requests);
+                self::assertLessThanOrEqual(25, count($requests));
+
+                foreach ($requests as $request) {
+                    $deletedIds[] = $request['DeleteRequest']['Key']['id']['S'];
+                }
+
+                return $this->createBatchWriteOutput();
+            });
+
+        $cache = new DynamoDbCache('test', $client);
+        self::assertTrue($cache->clear());
+        self::assertSame([25], $requestSizes);
+        self::assertEquals($ids, $deletedIds);
+    }
+
+    public function testClearSplitsBatchesWhenMoreThan25ItemsAreDeleted()
+    {
+        $ids = array_map(fn (int $i) => "test{$i}", range(1, 26));
+        $client = $this->createMock(DynamoDbClient::class);
+
+        $client->expects(self::once())
+            ->method('scan')
+            ->with(['TableName' => 'test'])
+            ->willReturn($this->createScanOutputForIds($ids));
+
+        $deletedIds = [];
+        $requestSizes = [];
+        $client->expects(self::exactly(2))
+            ->method('batchWriteItem')
+            ->willReturnCallback(function (array $input) use (&$deletedIds, &$requestSizes): BatchWriteItemOutput {
+                $requests = $input['RequestItems']['test'];
+                $requestSizes[] = count($requests);
+                self::assertLessThanOrEqual(25, count($requests));
+
+                foreach ($requests as $request) {
+                    $deletedIds[] = $request['DeleteRequest']['Key']['id']['S'];
+                }
+
+                return $this->createBatchWriteOutput();
+            });
+
+        $cache = new DynamoDbCache('test', $client);
+        self::assertTrue($cache->clear());
+        self::assertSame([25, 1], $requestSizes);
+        self::assertEquals($ids, $deletedIds);
+    }
+
     public function testDeleteItemDefaultKeys()
     {
         $result = $this->instance->deleteItem('test123');
@@ -1496,6 +1560,43 @@ final class DynamoDbCacheTest extends TestCase
                 );
             }
         };
+    }
+
+    /**
+     * @param array<string> $ids
+     */
+    private function createScanOutputForIds(array $ids): ScanOutput
+    {
+        return new class($ids) extends ScanOutput
+        {
+            /**
+             * @param array<string> $ids
+             */
+            public function __construct(
+                private array $ids
+            ) {
+            }
+
+            public function getIterator(): Traversable
+            {
+                return new ArrayIterator(array_map(
+                    fn (string $id) => ['id' => new AttributeValue(['S' => $id])],
+                    $this->ids
+                ));
+            }
+        };
+    }
+
+    private function createBatchWriteOutput(array $payload = []): BatchWriteItemOutput
+    {
+        $client = new MockHttpClient(new MockResponse(json_encode($payload)));
+        return new BatchWriteItemOutput(
+            new Response(
+                $client->request('GET', 'https://example.com'),
+                $client,
+                new NullLogger()
+            )
+        );
     }
 
     private function getEmptyBaseCacheItem()
