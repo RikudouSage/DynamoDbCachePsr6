@@ -4,10 +4,12 @@ namespace Rikudou\DynamoDbCache;
 
 use AsyncAws\DynamoDb\DynamoDbClient;
 use JetBrains\PhpStorm\ExpectedValues;
-use Rikudou\Clock\ClockInterface;
+use Psr\Clock\ClockInterface as PsrClock;
+use Rikudou\Clock\ClockInterface as RikudouClock;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
+use Rikudou\DynamoDbCache\Helper\ClockHelper;
 
 final class DynamoDbCacheBuilder
 {
@@ -19,7 +21,7 @@ final class DynamoDbCacheBuilder
 
     private ?string $prefix = null;
 
-    private ?ClockInterface $clock = null;
+    private ?PsrClock $clock = null;
 
     private ?CacheItemConverterRegistry $converterRegistry = null;
 
@@ -70,8 +72,10 @@ final class DynamoDbCacheBuilder
         return $copy;
     }
 
-    public function withClock(?ClockInterface $clock): self
+    public function withClock(RikudouClock|PsrClock|null $clock): self
     {
+        $clock = ClockHelper::psrClock($clock);
+
         $copy = clone $this;
         $copy->clock = $clock;
 

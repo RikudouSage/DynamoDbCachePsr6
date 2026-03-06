@@ -4,10 +4,10 @@ namespace Rikudou\Tests\DynamoDbCache\Converter;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
-use Rikudou\Clock\Clock;
 use Rikudou\DynamoDbCache\Converter\DefaultCacheItemConverter;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
+use Rikudou\DynamoDbCache\Helper\ClockHelper;
 
 final class DefaultCacheItemConverterTest extends TestCase
 {
@@ -33,7 +33,7 @@ final class DefaultCacheItemConverterTest extends TestCase
             true,
             'something',
             null,
-            new Clock(),
+            ClockHelper::psrClock(),
             new SerializeItemEncoder()
         );
         $this->basicCacheItem = $this->createBasicCacheItem();

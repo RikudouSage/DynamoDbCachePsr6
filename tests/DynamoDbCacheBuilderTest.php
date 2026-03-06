@@ -3,16 +3,17 @@
 namespace Rikudou\Tests\DynamoDbCache;
 
 use AsyncAws\DynamoDb\DynamoDbClient;
+use DateTimeInterface;
+use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use ReflectionObject;
-use Rikudou\Clock\Clock;
-use Rikudou\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Converter\CacheItemConverterRegistry;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\DynamoDbCacheBuilder;
-use PHPUnit\Framework\TestCase;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 use Rikudou\DynamoDbCache\Encoder\JsonItemEncoder;
 use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
+use Rikudou\DynamoDbCache\Helper\ClockHelper;
 
 class DynamoDbCacheBuilderTest extends TestCase
 {
@@ -51,7 +52,7 @@ class DynamoDbCacheBuilderTest extends TestCase
     {
         $registry = new CacheItemConverterRegistry();
         $encoder = new JsonItemEncoder();
-        $clock = new Clock();
+        $clock = ClockHelper::psrClock();
 
         self::assertNotSame($this->instance, $this->instance->withClock($clock));
         self::assertNotSame($this->instance, $this->instance->withConverterRegistry($registry));
@@ -171,7 +172,7 @@ class DynamoDbCacheBuilderTest extends TestCase
 
     public function testWithClock()
     {
-        $clock = new Clock();
+        $clock = ClockHelper::psrClock();
         $instance = $this->instance->withClock($clock);
 
         $result = $this->getBuiltData($instance->build());
@@ -179,7 +180,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertEquals('id', $result['primaryField']);
         self::assertEquals('ttl', $result['ttlField']);
         self::assertEquals('value', $result['valueField']);
-        self::assertSame($clock, $result['clock']);
+        self::assertSame($clock->now()->format(DateTimeInterface::RFC7231), $result['clock']->now()->format(DateTimeInterface::RFC7231));
         self::assertInstanceOf(CacheItemConverterRegistry::class, $result['converter']);
         self::assertInstanceOf(CacheItemEncoderInterface::class, $result['encoder']);
         self::assertNull($result['prefix']);
@@ -188,7 +189,7 @@ class DynamoDbCacheBuilderTest extends TestCase
 
     public function testAllAtOnce()
     {
-        $clock = new Clock();
+        $clock = ClockHelper::psrClock();
         $registry = new CacheItemConverterRegistry();
         $encoder = new JsonItemEncoder();
 
@@ -208,7 +209,7 @@ class DynamoDbCacheBuilderTest extends TestCase
         self::assertEquals('id1', $result['primaryField']);
         self::assertEquals('ttl1', $result['ttlField']);
         self::assertEquals('value1', $result['valueField']);
-        self::assertSame($clock, $result['clock']);
+        self::assertSame($clock->now()->format(DateTimeInterface::RFC7231), $result['clock']->now()->format(DateTimeInterface::RFC7231));
         self::assertSame($registry, $result['converter']);
         self::assertSame($encoder, $result['encoder']);
         self::assertEquals('testPrefix', $result['prefix']);

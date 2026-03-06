@@ -5,7 +5,7 @@ namespace Rikudou\DynamoDbCache;
 use DateInterval;
 use DateTimeInterface;
 use Psr\Cache\CacheItemInterface;
-use Rikudou\Clock\ClockInterface;
+use Psr\Clock\ClockInterface;
 use Rikudou\DynamoDbCache\Encoder\CacheItemEncoderInterface;
 
 final class DynamoCacheItem implements CacheItemInterface

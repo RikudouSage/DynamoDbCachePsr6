@@ -24,13 +24,12 @@ use Psr\Cache\CacheItemInterface;
 use Psr\Log\NullLogger;
 use ReflectionClass;
 use ReflectionObject;
-use Rikudou\Clock\Clock;
-use Rikudou\Clock\TestClock;
 use Rikudou\DynamoDbCache\DynamoCacheItem;
 use Rikudou\DynamoDbCache\DynamoDbCache;
 use Rikudou\DynamoDbCache\Encoder\SerializeItemEncoder;
 use Rikudou\DynamoDbCache\Enum\NetworkErrorMode;
 use Rikudou\DynamoDbCache\Exception\InvalidArgumentException;
+use Rikudou\DynamoDbCache\Helper\ClockHelper;
 use stdClass;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -659,7 +658,7 @@ final class DynamoDbCacheTest extends TestCase
             'id',
             'ttl',
             'value',
-            new TestClock(new DateTime('2030-01-01 15:00:00'))
+            ClockHelper::fixedTimeClock(new DateTimeImmutable('2030-01-01 15:00:00'))
         );
         self::assertTrue($instance->set('test2', 'test', 3600));
         self::assertCount(++$count, $this->itemPoolSaved);
@@ -671,7 +670,7 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($instance->set('test3', 'test', new DateInterval('P1DT3S')));
         self::assertCount(++$count, $this->itemPoolSaved);
         self::assertEquals(
-            '2030-01-02 16:00:03',
+            '2030-01-02 15:00:03',
             (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
         );
     }
@@ -690,7 +689,7 @@ final class DynamoDbCacheTest extends TestCase
             'id',
             'ttl',
             'value',
-            new TestClock(new DateTime('2030-01-01 15:00:00')),
+            ClockHelper::fixedTimeClock(new DateTimeImmutable('2030-01-01 15:00:00')),
             null,
             null,
             $this->prefix
@@ -705,7 +704,7 @@ final class DynamoDbCacheTest extends TestCase
         self::assertTrue($instance->set('test3', 'test', new DateInterval('P1DT3S')));
         self::assertCount(++$count, $this->itemPoolSaved);
         self::assertEquals(
-            '2030-01-02 16:00:03',
+            '2030-01-02 15:00:03',
             (new DateTime())->setTimestamp(end($this->itemPoolSaved)['ttl']['N'])->format('Y-m-d H:i:s')
         );
     }
@@ -831,7 +830,7 @@ final class DynamoDbCacheTest extends TestCase
             'id',
             'ttl',
             'value',
-            new TestClock(new DateTimeImmutable('2030-01-01 15:00:00'))
+            ClockHelper::fixedTimeClock(new DateTimeImmutable('2030-01-01 15:00:00'))
         );
 
         $this->itemPoolSaved = [];
@@ -890,7 +889,7 @@ final class DynamoDbCacheTest extends TestCase
             'id',
             'ttl',
             'value',
-            new TestClock(new DateTimeImmutable('2030-01-01 15:00:00')),
+            ClockHelper::fixedTimeClock(new DateTimeImmutable('2030-01-01 15:00:00')),
             null,
             null,
             $this->prefix
@@ -990,7 +989,7 @@ final class DynamoDbCacheTest extends TestCase
                 true,
                 '',
                 null,
-                new Clock(),
+                ClockHelper::psrClock(),
                 new SerializeItemEncoder()
             );
 
